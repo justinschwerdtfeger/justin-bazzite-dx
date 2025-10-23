@@ -12,16 +12,25 @@ set -ouex pipefail
 # this installs a package from fedora repos
 dnf5 install -y tmux
 
+# Install Niri from Copr
 dnf5 -y copr enable yalter/niri
 dnf5 -y install niri
+dnf5 -y copr disable yalter/niri
 
+# Install Niri Dependencies
 dnf5 -y install brightnessctl
 dnf5 -y install fuzzel
 dnf5 -y install mako
 dnf5 -y install waybar
 dnf5 -y install swaybg
 dnf5 -y install swayidle
-dnf5 -y install swaylock
+
+# Install hyprlock from copr
+dnf5 -y copr enable solopasha/hyprland
+dnf5 -y install hyprlock
+dnf5 -y copr disable solopasha/hyprland
+
+
 
 # Use a COPR Example:
 #
