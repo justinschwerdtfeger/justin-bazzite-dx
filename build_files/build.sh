@@ -19,6 +19,9 @@ dnf5 -y install brightnessctl
 dnf5 -y install fuzzel
 dnf5 -y install mako
 dnf5 -y install waybar
+dnf5 -y install swaybg
+dnf5 -y install swayidle
+dnf5 -y install swaylock
 
 # Use a COPR Example:
 #
