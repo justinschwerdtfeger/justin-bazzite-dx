@@ -15,10 +15,10 @@ dnf5 install -y tmux
 dnf5 -y copr enable yalter/niri
 dnf5 -y install niri
 
-dnfy -y install brightnessctl
-dnfy -y install fuzzel
-dnfy -y install mako
-dnfy -y install waybar
+dnf5 -y install brightnessctl
+dnf5 -y install fuzzel
+dnf5 -y install mako
+dnf5 -y install waybar
 
 # Use a COPR Example:
 #
