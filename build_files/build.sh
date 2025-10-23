@@ -30,7 +30,15 @@ dnf5 -y copr enable solopasha/hyprland
 dnf5 -y install hyprlock
 dnf5 -y copr disable solopasha/hyprland
 
+# Dank Material Shell
+dnf5 -y copr enable avengemedia/dms
+dnf5 -y install dms
+dnf5 -y copr disable avengemedia/dms
 
+#
+dnf5 -y copr enable zhangyi6324/noctalia-shell
+dnf5 -y install noctalia-shell
+dnf5 -y copr disable zhangyi6324/noctalia-shell
 
 # Use a COPR Example:
 #
