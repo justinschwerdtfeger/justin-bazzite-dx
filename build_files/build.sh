@@ -35,17 +35,15 @@ dnf5 -y copr enable avengemedia/dms
 dnf5 -y install dms
 dnf5 -y copr disable avengemedia/dms
 
-#
+# Noctalia Shell
 dnf5 -y copr enable zhangyi6324/noctalia-shell
 dnf5 -y install noctalia-shell
 dnf5 -y copr disable zhangyi6324/noctalia-shell
 
-# Use a COPR Example:
-#
-# dnf5 -y copr enable ublue-os/staging
-# dnf5 -y install package
-# Disable COPRs so they don't end up enabled on the final image:
-# dnf5 -y copr disable ublue-os/staging
+# Global Protect Open Connect for UTD-VPN
+dnf5 -y copr enable yuezk/globalprotect-openconnect
+dnf5 -y install globalprotect-openconnect
+dnf5 -y copr disable yuezk/globalprotect-openconnect
 
 #### Example for enabling a System Unit File
 
