@@ -28,13 +28,15 @@ dnf5 -y install swayidle
 # Dank Material Shell
 dnf5 -y copr enable avengemedia/dms
 dnf5 -y copr enable avengemedia/danklinux
-dnf5 -y install cliphist
-dnf5 -y install dgop
-dnf5 -y install danksearch
-dnf5 -y install hyprpicker
-dnf5 -y install material-symbols-fonts
-dnf5 -y install matugen
+dnf5 -y install cliphist # For clipboard History
+dnf5 -y install dgop # For Resource monitoring
+dnf5 -y install danksearch # For File Search
+dnf5 -y install hyprpicker # For Color Picker
+dnf5 -y install material-symbols-fonts # For DMS Font
+dnf5 -y install matugen # For Theme 
+dnf5 -y install wl-mirror # For screen mirror
 dnf5 -y install dms
+dnf5 -y copr disableavengemedia/danklinux
 dnf5 -y copr disable avengemedia/dms
 
 
