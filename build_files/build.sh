@@ -36,7 +36,7 @@ dnf5 -y install material-symbols-fonts # For DMS Font
 dnf5 -y install matugen # For Theme 
 dnf5 -y install wl-mirror # For screen mirror
 dnf5 -y install dms
-dnf5 -y copr disableavengemedia/danklinux
+dnf5 -y copr disable avengemedia/danklinux
 dnf5 -y copr disable avengemedia/dms
 
 
