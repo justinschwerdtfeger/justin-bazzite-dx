@@ -25,11 +25,6 @@ dnf5 -y install waybar
 dnf5 -y install swaybg
 dnf5 -y install swayidle
 
-# Install hyprlock from copr
-dnf5 -y copr enable solopasha/hyprland
-dnf5 -y install hyprlock
-dnf5 -y copr disable solopasha/hyprland
-
 # Dank Material Shell
 dnf5 -y copr enable avengemedia/dms
 dnf5 -y copr enable avengemedia/danklinux
