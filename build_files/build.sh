@@ -32,13 +32,16 @@ dnf5 -y copr disable solopasha/hyprland
 
 # Dank Material Shell
 dnf5 -y copr enable avengemedia/dms
+dnf5 -y copr enable avengemedia/danklinux
+dnf5 -y install cliphist
+dnf5 -y install dgop
+dnf5 -y install danksearch
+dnf5 -y install hyprpicker
+dnf5 -y install material-symbols-fonts
+dnf5 -y install matugen
 dnf5 -y install dms
 dnf5 -y copr disable avengemedia/dms
 
-# Noctalia Shell
-dnf5 -y copr enable zhangyi6324/noctalia-shell
-dnf5 -y install noctalia-shell
-dnf5 -y copr disable zhangyi6324/noctalia-shell
 
 # Global Protect Open Connect for UTD-VPN
 dnf5 -y copr enable yuezk/globalprotect-openconnect
