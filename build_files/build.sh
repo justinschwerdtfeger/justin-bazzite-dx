@@ -45,6 +45,17 @@ dnf5 -y copr enable yuezk/globalprotect-openconnect
 dnf5 -y install globalprotect-openconnect
 dnf5 -y copr disable yuezk/globalprotect-openconnect
 
+# Install Tauri Dependencies
+dnf5 -y install webkit2gtk4.1-devel \
+  openssl-devel \
+  curl \
+  wget \
+  file \
+  libappindicator-gtk3-devel \
+  librsvg2-devel \
+  libxdo-devel
+dnf5 group install "c-development"
+
 #### Example for enabling a System Unit File
 
 systemctl enable podman.socket
