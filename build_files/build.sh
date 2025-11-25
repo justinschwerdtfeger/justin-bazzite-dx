@@ -54,7 +54,7 @@ dnf5 -y install webkit2gtk4.1-devel \
   libappindicator-gtk3-devel \
   librsvg2-devel \
   libxdo-devel
-dnf5 group install "c-development"
+dnf5 -y group install "c-development"
 
 #### Example for enabling a System Unit File
 
