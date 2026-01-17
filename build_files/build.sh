@@ -70,7 +70,7 @@ dnf5 makecache
 dnf5 -y install antigravity
 dnf5 config-manager setopt antigravity-rpm.enabled=0
 
-dnf5 -y google-chrome
+dnf5 -y install google-chrome
 
 #### Example for enabling a System Unit File
 
