@@ -62,6 +62,14 @@ dnf5 -y copr enable dejan/lazygit
 dnf5 -y install lazygit
 dnf5 -y copr disable dejan/lazygit
 
+dnf5 config-manager addrepo --id="antigravity-rpm" \
+    --set=name="Antigravity RPM Repository" \
+    --set=baseurl="https://us-central1-yum.pkg.dev/projects/antigravity-auto-updater-dev/antigravity-rpm" \
+    --set=gpgcheck=0
+dnf5 makecache
+dnf5 -y install antigravity
+dnf5 config-manager setopt antigravity-rpm.enabled=0
+
 #### Example for enabling a System Unit File
 
 systemctl enable podman.socket
