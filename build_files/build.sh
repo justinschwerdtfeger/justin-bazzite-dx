@@ -9,8 +9,27 @@ set -ouex pipefail
 # List of rpmfusion packages can be found here:
 # https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/39/x86_64/repoview/index.html&protocol=https&redirect=1
 
-# this installs a package from fedora repos
-dnf5 install -y tmux
+# No option for installing latest, so this must be updated manually
+dnf5 -y install https://api2.cursor.sh/updates/download/golden/linux-x64-rpm/cursor/2.3
+
+# Install Antigravity
+dnf5 config-manager addrepo --id="antigravity-rpm" \
+    --set=name="Antigravity RPM Repository" \
+    --set=baseurl="https://us-central1-yum.pkg.dev/projects/antigravity-auto-updater-dev/antigravity-rpm" \
+    --set=gpgcheck=0
+dnf5 makecache
+dnf5 -y install antigravity
+dnf5 config-manager setopt antigravity-rpm.enabled=0
+
+# Install Google Chrome
+dnf5 config-manager addrepo --id="google-chrome" \
+    --set=name="Google Chrome" \
+    --set=baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" \
+    --set=gpgkey="https://dl.google.com/linux/linux_signing_key.pub" \
+    --set=gpgcheck=1
+dnf5 makecache
+dnf5 -y install google-chrome-stable
+dnf5 config-manager setopt google-chrome.enabled=0
 
 # Install Niri from Copr
 dnf5 -y copr enable yalter/niri
@@ -61,26 +80,6 @@ dnf5 -y install golang
 dnf5 -y copr enable dejan/lazygit
 dnf5 -y install lazygit
 dnf5 -y copr disable dejan/lazygit
-
-dnf5 config-manager addrepo --id="antigravity-rpm" \
-    --set=name="Antigravity RPM Repository" \
-    --set=baseurl="https://us-central1-yum.pkg.dev/projects/antigravity-auto-updater-dev/antigravity-rpm" \
-    --set=gpgcheck=0
-dnf5 makecache
-dnf5 -y install antigravity
-dnf5 config-manager setopt antigravity-rpm.enabled=0
-
-dnf5 config-manager addrepo --id="google-chrome" \
-    --set=name="Google Chrome" \
-    --set=baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" \
-    --set=gpgkey="https://dl.google.com/linux/linux_signing_key.pub" \
-    --set=gpgcheck=1
-dnf5 makecache
-dnf5 -y install google-chrome-stable
-dnf5 config-manager setopt google-chrome.enabled=0
-
-# No option for installing latest, so this must be updated manually
-dnf5 -y install https://api2.cursor.sh/updates/download/golden/linux-arm64-rpm/cursor/2.3
 
 #### Example for enabling a System Unit File
 
