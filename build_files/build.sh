@@ -25,7 +25,7 @@ dnf5 -y install swaybg
 dnf5 -y install swayidle
 
 # Install Noctalia Shell
-dnf5 -y install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
+dnf5 -y config-manager setopt terra.enabled=1
 dnf5 -y install noctalia-shell
 dnf5 -y config-manager setopt terra.enabled=0
 
