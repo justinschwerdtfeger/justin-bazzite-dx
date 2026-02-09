@@ -9,6 +9,26 @@ set -ouex pipefail
 # List of rpmfusion packages can be found here:
 # https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/39/x86_64/repoview/index.html&protocol=https&redirect=1
 
+
+
+# Install Niri from Copr
+dnf5 -y copr enable yalter/niri
+dnf5 -y install niri
+dnf5 -y copr disable yalter/niri
+
+# Install Niri Dependencies
+dnf5 -y install brightnessctl
+dnf5 -y install fuzzel
+dnf5 -y install mako
+dnf5 -y install waybar
+dnf5 -y install swaybg
+dnf5 -y install swayidle
+
+# Install Noctalia Shell
+dnf5 -y install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
+dnf5 -y install noctalia-shell
+dnf5 -y config-manager setopt terra.enabled=0
+
 # No option for installing latest, so this must be updated manually
 dnf5 -y install https://api2.cursor.sh/updates/download/golden/linux-x64-rpm/cursor/2.3
 
@@ -31,32 +51,19 @@ dnf5 makecache
 dnf5 -y install google-chrome-stable
 dnf5 config-manager setopt google-chrome.enabled=0
 
-# Install Niri from Copr
-dnf5 -y copr enable yalter/niri
-dnf5 -y install niri
-dnf5 -y copr disable yalter/niri
-
-# Install Niri Dependencies
-dnf5 -y install brightnessctl
-dnf5 -y install fuzzel
-dnf5 -y install mako
-dnf5 -y install waybar
-dnf5 -y install swaybg
-dnf5 -y install swayidle
-
-# Dank Material Shell
-dnf5 -y copr enable avengemedia/dms
-dnf5 -y copr enable avengemedia/danklinux
-dnf5 -y install cliphist # For clipboard History
-dnf5 -y install dgop # For Resource monitoring
-dnf5 -y install danksearch # For File Search
-dnf5 -y install material-symbols-fonts # For DMS Font
-dnf5 -y install matugen # For Theme 
-dnf5 -y install wl-mirror # For screen mirror
-dnf5 -y install qt6-qtmultimedia 
-dnf5 -y install dms
-dnf5 -y copr disable avengemedia/danklinux
-dnf5 -y copr disable avengemedia/dms
+# # Dank Material Shell
+# dnf5 -y copr enable avengemedia/dms
+# dnf5 -y copr enable avengemedia/danklinux
+# dnf5 -y install cliphist # For clipboard History
+# dnf5 -y install dgop # For Resource monitoring
+# dnf5 -y install danksearch # For File Search
+# dnf5 -y install material-symbols-fonts # For DMS Font
+# dnf5 -y install matugen # For Theme 
+# dnf5 -y install wl-mirror # For screen mirror
+# dnf5 -y install qt6-qtmultimedia 
+# dnf5 -y install dms
+# dnf5 -y copr disable avengemedia/danklinux
+# dnf5 -y copr disable avengemedia/dms
 
 
 # Global Protect Open Connect for UTD-VPN
