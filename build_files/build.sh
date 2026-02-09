@@ -9,15 +9,15 @@ set -ouex pipefail
 # List of rpmfusion packages can be found here:
 # https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/39/x86_64/repoview/index.html&protocol=https&redirect=1
 
-# Install Keyd from Copr
-dnf5 -y copr enable alternateved/keyd
-dnf5 -y install keyd
-dnf5 -y copr disable alternateved/keyd
-
 # Install Niri from Copr
 dnf5 -y copr enable yalter/niri
 dnf5 -y install niri
 dnf5 -y copr disable yalter/niri
+
+# Install Keyd from Copr
+dnf5 -y copr enable alternateved/keyd
+dnf5 -y install keyd
+dnf5 -y copr disable alternateved/keyd
 
 # Install Niri Dependencies
 dnf5 -y install brightnessctl
