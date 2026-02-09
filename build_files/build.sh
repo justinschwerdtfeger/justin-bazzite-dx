@@ -14,6 +14,8 @@ dnf5 -y copr enable yalter/niri
 dnf5 -y install niri
 dnf5 -y copr disable yalter/niri
 
+dnf5 -y install cliphist # For clipboard History
+
 # Install Keyd from Copr
 dnf5 -y copr enable alternateved/keyd
 dnf5 -y install keyd
