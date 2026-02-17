@@ -17,6 +17,7 @@ dnf5 -y install neovim python3-neovim
 
 # Install pipx for brotab (tab search)
 dnf5 -y install pipx
+dnf5 -y install python3-devel
 
 # Install Vicinae from Copr
 dnf5 -y copr enable quadratech188/vicinae
@@ -52,19 +53,19 @@ dnf5 -y install https://api2.cursor.sh/updates/download/golden/linux-x64-rpm/cur
 
 # Install Antigravity
 dnf5 config-manager addrepo --id="antigravity-rpm" \
-    --set=name="Antigravity RPM Repository" \
-    --set=baseurl="https://us-central1-yum.pkg.dev/projects/antigravity-auto-updater-dev/antigravity-rpm" \
-    --set=gpgcheck=0
+  --set=name="Antigravity RPM Repository" \
+  --set=baseurl="https://us-central1-yum.pkg.dev/projects/antigravity-auto-updater-dev/antigravity-rpm" \
+  --set=gpgcheck=0
 dnf5 makecache
 dnf5 -y install antigravity
 dnf5 config-manager setopt antigravity-rpm.enabled=0
 
 # Install Google Chrome
 dnf5 config-manager addrepo --id="google-chrome" \
-    --set=name="Google Chrome" \
-    --set=baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" \
-    --set=gpgkey="https://dl.google.com/linux/linux_signing_key.pub" \
-    --set=gpgcheck=1
+  --set=name="Google Chrome" \
+  --set=baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" \
+  --set=gpgkey="https://dl.google.com/linux/linux_signing_key.pub" \
+  --set=gpgcheck=1
 dnf5 makecache
 dnf5 -y install google-chrome-stable
 dnf5 config-manager setopt google-chrome.enabled=0
@@ -76,13 +77,12 @@ dnf5 config-manager setopt google-chrome.enabled=0
 # dnf5 -y install dgop # For Resource monitoring
 # dnf5 -y install danksearch # For File Search
 # dnf5 -y install material-symbols-fonts # For DMS Font
-# dnf5 -y install matugen # For Theme 
+# dnf5 -y install matugen # For Theme
 # dnf5 -y install wl-mirror # For screen mirror
-# dnf5 -y install qt6-qtmultimedia 
+# dnf5 -y install qt6-qtmultimedia
 # dnf5 -y install dms
 # dnf5 -y copr disable avengemedia/danklinux
 # dnf5 -y copr disable avengemedia/dms
-
 
 # Global Protect Open Connect for UTD-VPN
 dnf5 -y copr enable yuezk/globalprotect-openconnect
