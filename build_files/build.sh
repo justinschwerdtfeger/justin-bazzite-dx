@@ -10,7 +10,7 @@ set -ouex pipefail
 # https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/39/x86_64/repoview/index.html&protocol=https&redirect=1
 
 # Install pipx
-dnf5 -y pipx
+dnf5 -y install pipx
 
 # Install Vicinae from Copr
 dnf5 -y copr enable quadratech188/vicinae
