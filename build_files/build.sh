@@ -9,6 +9,9 @@ set -ouex pipefail
 # List of rpmfusion packages can be found here:
 # https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/39/x86_64/repoview/index.html&protocol=https&redirect=1
 
+# Install pipx
+dnf5 -y pipx
+
 # Install Vicinae from Copr
 dnf5 -y copr enable quadratech188/vicinae
 dnf5 -y install vicinae
