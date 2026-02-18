@@ -9,6 +9,9 @@ set -ouex pipefail
 # List of rpmfusion packages can be found here:
 # https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/39/x86_64/repoview/index.html&protocol=https&redirect=1
 
+# Install wlsunset for Night light
+dnf5 -y install wlsunset
+
 # Install lazygit dependencies
 dnf5 -y install ripgrep
 dnf5 -y install fd-find
