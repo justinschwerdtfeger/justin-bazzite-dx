@@ -106,8 +106,6 @@ dnf5 -y install webkit2gtk4.1-devel \
   libxdo-devel
 dnf5 -y group install "c-development"
 
-dnf5 -y install golang
-
 dnf5 -y copr enable dejan/lazygit
 dnf5 -y install lazygit
 dnf5 -y copr disable dejan/lazygit
