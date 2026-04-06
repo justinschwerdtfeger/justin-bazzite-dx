@@ -10,15 +10,15 @@ set -ouex pipefail
 # https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/39/x86_64/repoview/index.html&protocol=https&redirect=1
 
 # Install DMS
-dnf5 -y copr enable avengemedia/dms
-dnf5 -y install dms
-dnf5 -y copr disable avengemedia/dms
+# dnf5 -y copr enable avengemedia/dms
+# dnf5 -y install dms
+# dnf5 -y copr disable avengemedia/dms
 
 # Install Noctalia Shell
-# dnf5 -y config-manager setopt terra.enabled=1
-# dnf5 -y install noctalia-shell
-# dnf5 -y install cliphist # For clipboard History
-# dnf5 -y config-manager setopt terra.enabled=0
+dnf5 -y config-manager setopt terra.enabled=1
+dnf5 -y install noctalia-shell
+dnf5 -y install cliphist # For clipboard History
+dnf5 -y config-manager setopt terra.enabled=0
 
 # Install haskell dependencies
 dnf5 -y install gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl
