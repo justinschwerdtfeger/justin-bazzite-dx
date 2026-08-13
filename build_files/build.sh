@@ -14,11 +14,6 @@ set -ouex pipefail
 # dnf5 -y install dms
 # dnf5 -y copr disable avengemedia/dms
 
-# Install Antigravity IDE
-dnf5 -y config-manager setopt terra.enabled=1
-dnf5 -y install antigravity
-dnf5 -y config-manager setopt terra.enabled=0
-
 dnf5 -y copr enable daniel-g-carrasco/wayland-scroll-factor
 dnf5 -y install wayland-scroll-factor
 dnf5 -y copr disable daniel-g-carrasco/wayland-scroll-factor
