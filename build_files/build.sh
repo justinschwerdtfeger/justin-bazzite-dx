@@ -68,15 +68,6 @@ dnf5 -y install waybar
 dnf5 -y install swaybg
 dnf5 -y install swayidle
 
-# Install Antigravity
-dnf5 config-manager addrepo --id="antigravity-rpm" \
-  --set=name="Antigravity RPM Repository" \
-  --set=baseurl="https://us-central1-yum.pkg.dev/projects/antigravity-auto-updater-dev/antigravity-rpm" \
-  --set=gpgcheck=0
-dnf5 makecache
-dnf5 -y install antigravity
-dnf5 config-manager setopt antigravity-rpm.enabled=0
-
 # Install Google Chrome
 dnf5 config-manager addrepo --id="google-chrome" \
   --set=name="Google Chrome" \
