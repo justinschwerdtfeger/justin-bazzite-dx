@@ -14,6 +14,10 @@ set -ouex pipefail
 # dnf5 -y install dms
 # dnf5 -y copr disable avengemedia/dms
 
+dnf5 -y copr enable daniel-g-carrasco/wayland-scroll-factor
+dnf5 -y install wayland-scroll-factor
+dnf5 -y copr disable daniel-g-carrasco/wayland-scroll-factor
+
 # Install Cursor
 dnf5 -y config-manager setopt terra.enabled=1
 dnf5 -y install cursor
