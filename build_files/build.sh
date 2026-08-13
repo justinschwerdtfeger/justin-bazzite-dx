@@ -16,7 +16,7 @@ set -ouex pipefail
 
 # Install Cursor
 dnf5 -y config-manager setopt terra.enabled=1
-dnf5 -y cursor
+dnf5 -y install cursor
 dnf5 -y config-manager setopt terra.enabled=0
 
 # Install Noctalia Shell
