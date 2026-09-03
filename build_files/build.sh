@@ -23,12 +23,6 @@ dnf5 -y config-manager setopt terra.enabled=1
 dnf5 -y install cursor
 dnf5 -y config-manager setopt terra.enabled=0
 
-# Install Noctalia Shell
-dnf5 -y config-manager setopt terra.enabled=1
-dnf5 -y install noctalia-shell
-dnf5 -y install cliphist # For clipboard History
-dnf5 -y config-manager setopt terra.enabled=0
-
 # Install haskell dependencies
 dnf5 -y install gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl
 
@@ -62,11 +56,11 @@ dnf5 -y copr disable alternateved/keyd
 
 # Install Niri Dependencies
 dnf5 -y install brightnessctl
-dnf5 -y install fuzzel
-dnf5 -y install mako
-dnf5 -y install waybar
-dnf5 -y install swaybg
-dnf5 -y install swayidle
+# dnf5 -y install fuzzel
+# dnf5 -y install mako
+# dnf5 -y install waybar
+# dnf5 -y install swaybg
+# dnf5 -y install swayidle
 
 # Install Google Chrome
 dnf5 config-manager addrepo --id="google-chrome" \
