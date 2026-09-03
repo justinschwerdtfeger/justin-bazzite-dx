@@ -9,10 +9,15 @@ set -ouex pipefail
 # List of rpmfusion packages can be found here:
 # https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/39/x86_64/repoview/index.html&protocol=https&redirect=1
 
-# Install DMS
-# dnf5 -y copr enable avengemedia/dms
-# dnf5 -y install dms
-# dnf5 -y copr disable avengemedia/dms
+# Dank Material Shell
+dnf5 -y config-manager setopt terra.enabled=1
+dnf5 -y install dgop # For Resource monitoring
+dnf5 -y install dsearch # For File Search
+dnf5 -y install matugen # For Theme
+dnf5 -y install wl-mirror # For screen mirror
+dnf5 -y install qt6-qtmultimedia
+dnf5 -y install dms
+dnf5 -y config-manager setopt terra.enabled=0
 
 # Install Noctalia Shell
 dnf5 -y config-manager setopt terra.enabled=1
@@ -79,19 +84,6 @@ dnf5 makecache
 dnf5 -y install google-chrome-stable
 dnf5 config-manager setopt google-chrome.enabled=0
 
-# # Dank Material Shell
-# dnf5 -y copr enable avengemedia/dms
-# dnf5 -y copr enable avengemedia/danklinux
-# dnf5 -y install cliphist # For clipboard History
-# dnf5 -y install dgop # For Resource monitoring
-# dnf5 -y install danksearch # For File Search
-# dnf5 -y install material-symbols-fonts # For DMS Font
-# dnf5 -y install matugen # For Theme
-# dnf5 -y install wl-mirror # For screen mirror
-# dnf5 -y install qt6-qtmultimedia
-# dnf5 -y install dms
-# dnf5 -y copr disable avengemedia/danklinux
-# dnf5 -y copr disable avengemedia/dms
 
 # Global Protect Open Connect for UTD-VPN
 dnf5 -y copr enable yuezk/globalprotect-openconnect
