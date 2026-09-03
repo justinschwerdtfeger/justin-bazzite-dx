@@ -16,6 +16,7 @@ set -ouex pipefail
 
 # Install Noctalia Shell
 dnf5 -y config-manager setopt terra.enabled=1
+dnf5 -y install noctalia-legacy
 dnf5 -y install noctalia
 dnf5 -y install cliphist # For clipboard History
 dnf5 -y config-manager setopt terra.enabled=0
