@@ -9,6 +9,9 @@ set -ouex pipefail
 # List of rpmfusion packages can be found here:
 # https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/39/x86_64/repoview/index.html&protocol=https&redirect=1
 
+# IOTOP for io monitoring
+dnf5 -y install iotop
+
 # Dank Material Shell
 dnf5 -y config-manager setopt terra.enabled=1
 dnf5 -y install dgop # For Resource monitoring
