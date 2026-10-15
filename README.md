@@ -1,5 +1,43 @@
 # image-template
 
+## Switch this machine back to the GitHub build
+
+After using a local development build, switch back to the image published by
+this repository:
+
+```bash
+sudo bootc switch --transport registry ghcr.io/justinschwerdtfeger/justin-bazzite-dx:latest
+```
+
+Reboot when ready, then check `sudo bootc status` to confirm the booted image.
+Future updates follow the registry image again; `sudo bootc upgrade` stages an
+update manually.
+
+## Build performance
+
+The container workflow uses rootful Buildah with native overlay storage. This
+avoids the build action's automatic `fuse-overlayfs` override, which was used in
+the September 3, 2026 build that spent about 9.5 minutes linting and 25.5 minutes
+committing the image. The October 13 build already completed in about 8 minutes,
+so future timings should be compared against that more recent baseline.
+
+Build layers are saved in the separate GHCR package
+`ghcr.io/justinschwerdtfeger/justin-bazzite-dx-build-cache`. Only builds publishing
+from the default branch write this cache; pull requests cannot overwrite it, and
+fork pull requests build without reading it. The main OS image and its tags stay
+at the existing registry location. The cache package must grant this repository's
+Actions token read/write access if a package with that name already exists.
+
+The workflow always checks for a newer base image. A daily cache key forces
+package installations to run again each UTC day, so scheduled builds still pick
+up package updates. Changes to build scripts also invalidate package layers;
+artwork changes rerun initramfs generation without reinstalling packages. Choose
+**fresh-build** when running the workflow manually to ignore all cached layers.
+The first build populates the cache and may take longer; subsequent builds on the
+same day can reuse it when the base and inputs match. Package installs are grouped
+to reduce repeated transactions, and the published digest is signed once for all
+its tags. Changes outside the image inputs no longer trigger container builds.
+
 This repository is meant to be a template for building your own custom [bootc](https://github.com/bootc-dev/bootc) image. This template is the recommended way to make customizations to any image published by the Universal Blue Project.
 
 # Community

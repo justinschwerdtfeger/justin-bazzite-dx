@@ -93,10 +93,13 @@ build $target_image=image_name $tag=default_tag:
     if [[ -z "$(git status -s)" ]]; then
         BUILD_ARGS+=("--build-arg" "SHA_HEAD_SHORT=$(git rev-parse --short HEAD)")
     fi
+    BUILD_SCRIPTS_SHA=$(find build_files -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d ' ' -f 1)
 
     podman build \
         "${BUILD_ARGS[@]}" \
         --pull=newer \
+        --build-arg "PACKAGE_REFRESH=$(date -u +%Y%m%d)" \
+        --build-arg "BUILD_SCRIPTS_SHA=$BUILD_SCRIPTS_SHA" \
         --tag "${target_image}:${tag}" \
         .
 
