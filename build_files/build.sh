@@ -4,6 +4,10 @@ set -ouex pipefail
 
 ### Install packages
 
+# Install Firefox in the OS image.
+dnf5 -y install firefox
+rpm -q firefox
+
 dnf5 -y install wireshark
 
 # Packages can be installed from any enabled yum repo on the image.

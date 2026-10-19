@@ -136,6 +136,9 @@ jobs:
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Cosign reads Docker's credentials, not Buildah's auth file.
+          printf '%s' "$REGISTRY_PASSWORD" | docker login \
+            --username "$REGISTRY_USER" --password-stdin ghcr.io
           printf '%s' "$REGISTRY_PASSWORD" | sudo buildah login \
             --authfile "$REGISTRY_AUTH_FILE" \
             --username "$REGISTRY_USER" --password-stdin ghcr.io
