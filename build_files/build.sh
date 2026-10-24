@@ -18,10 +18,7 @@ dnf5 -y install wireshark
 # IOTOP for io monitoring
 dnf5 -y install iotop
 
-# Dank Material Shell and all optional dependencies:
-# https://danklinux.com/docs/dankmaterialshell/installation
-# Use upstream's stable DMS repository rather than Terra's DMS package.
-dnf5 -y copr enable avengemedia/dms
+# Dux Shell uses the prebuilt custom release; keep its runtime dependencies.
 dnf5 -y copr enable avengemedia/danklinux
 dnf5 -y config-manager setopt terra.enabled=0
 dnf5 -y --refresh install \
@@ -30,14 +27,16 @@ dnf5 -y --refresh install \
   dgop \
   danksearch \
   matugen \
+  quickshell \
+  accountsservice \
   wl-mirror \
+  curl \
+  jq \
+  tar \
+  gzip \
   qt6-qtmultimedia
 # Niri is installed below from yalter/niri.
-# Refresh cached metadata and update DMS even if the base already includes it.
-dnf5 -y --refresh install dms
-dnf5 -y --refresh upgrade dms
-rpm -q dms cava dankcalendar-git dgop danksearch matugen qt6-qtmultimedia
-dnf5 -y copr disable avengemedia/dms
+rpm -q quickshell accountsservice cava dankcalendar-git dgop danksearch matugen qt6-qtmultimedia
 dnf5 -y copr disable avengemedia/danklinux
 
 # Install Noctalia Shell

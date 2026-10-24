@@ -39,6 +39,13 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     test -n "$PACKAGE_REFRESH" && test -n "$BUILD_SCRIPTS_SHA" && \
     /ctx/build.sh
 
+# Refresh the prebuilt shell on every build without reinstalling packages.
+# CI and `just build` supply a fresh value for this layer's cache key.
+ARG DUX_SHELL_REFRESH=local
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/tmp \
+    test -n "$DUX_SHELL_REFRESH" && bash /ctx/install-dux-shell.sh
+
 # Artwork changes can reuse package installation. Copy before dracut so the
 # custom Plymouth artwork is included in the generated initramfs.
 COPY system_files /
