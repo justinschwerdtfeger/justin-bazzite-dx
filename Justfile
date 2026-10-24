@@ -99,6 +99,7 @@ build $target_image=image_name $tag=default_tag:
         "${BUILD_ARGS[@]}" \
         --pull=newer \
         --build-arg "PACKAGE_REFRESH=$(date -u +%Y%m%d)" \
+        --build-arg "DUX_SHELL_REFRESH=$(date -u +%s%N)" \
         --build-arg "BUILD_SCRIPTS_SHA=$BUILD_SCRIPTS_SHA" \
         --tag "${target_image}:${tag}" \
         .
