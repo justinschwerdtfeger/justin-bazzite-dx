@@ -1,19 +1,25 @@
-# Allow build scripts to be referenced without being copied into the final image
-FROM scratch AS ctx
-COPY build_files /
+ARG DESKTOP=gnome
 
-# Base Image
-FROM ghcr.io/ublue-os/bazzite-dx-gnome:stable-44
-COPY system_files /
+# Upstream names KDE's image bazzite-dx; retain GNOME as the default.
+FROM ghcr.io/ublue-os/bazzite-dx-gnome:stable-44 AS base-gnome
+FROM ghcr.io/ublue-os/bazzite-dx:stable-44 AS base-kde
 
-## Other possible base images include:
-# FROM ghcr.io/ublue-os/bazzite:latest
-# FROM ghcr.io/ublue-os/bluefin-nvidia:stable
-# 
-# ... and so on, here are more base images
-# Universal Blue Images: https://github.com/orgs/ublue-os/packages
-# Fedora base image: quay.io/fedora/fedora-bootc:41
-# CentOS base images: quay.io/centos-bootc/centos-bootc:stream10
+# Keep script contexts separate so shell/initramfs edits don't invalidate packages.
+# Bind mounts keep the scripts out of the final image.
+FROM scratch AS packages_ctx
+COPY build_files/build.sh /
+COPY build_files/packages /packages
+
+FROM scratch AS initramfs_ctx
+COPY build_files/build-initramfs.sh /
+
+FROM scratch AS shell_ctx
+COPY build_files/install-dux-shell.sh /
+
+# Select the desktop base; every customization below is shared.
+FROM base-${DESKTOP} AS final
+ARG DESKTOP
+LABEL io.github.justinschwerdtfeger.desktop="${DESKTOP}"
 
 ### [IM]MUTABLE /opt
 ## Some bootable images, like Fedora, have /opt symlinked to /var/opt, in order to
@@ -30,13 +36,33 @@ RUN rm /opt && mkdir /opt
 ## make modifications desired in your image and install packages by modifying the build.sh script
 ## the following RUN directive does all the things required to run "build.sh" as recommended.
 
-RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
-    --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
+# CI changes this daily so cached package installs still receive repository updates.
+ARG PACKAGE_REFRESH=local
+ARG PACKAGE_SCRIPT_SHA=local
+# DNF deletes cached RPMs after installing them; concurrent builds must wait.
+RUN --mount=type=bind,from=packages_ctx,source=/,target=/ctx \
+    --mount=type=cache,dst=/var/cache,sharing=locked \
+    --mount=type=cache,dst=/var/log,sharing=locked \
     --mount=type=tmpfs,dst=/tmp \
-    /ctx/build.sh && \
-    /ctx/build-initramfs.sh
-    
-### LINTING
-## Verify final image and contents are correct.
-RUN bootc container lint
+    test -n "$PACKAGE_REFRESH" && test -n "$PACKAGE_SCRIPT_SHA" && \
+    /ctx/build.sh
+
+# Artwork changes can reuse package installation. Copy before dracut so the
+# custom Plymouth artwork is included in the generated initramfs.
+COPY system_files /
+
+ARG INITRAMFS_SCRIPT_SHA=local
+RUN --mount=type=bind,from=initramfs_ctx,source=/,target=/ctx \
+    --mount=type=cache,dst=/var/cache,sharing=locked \
+    --mount=type=cache,dst=/var/log,sharing=locked \
+    --mount=type=tmpfs,dst=/tmp \
+    test -n "$INITRAMFS_SCRIPT_SHA" && /ctx/build-initramfs.sh
+
+# Refresh the prebuilt shell after dracut so it doesn't invalidate the initramfs.
+# CI and `just build` supply a fresh value for this layer's cache key.
+# Lint in the same RUN to avoid another filesystem scan/commit of the OS image.
+ARG DUX_SHELL_REFRESH=local
+RUN --mount=type=bind,from=shell_ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/tmp \
+    test -n "$DUX_SHELL_REFRESH" && bash /ctx/install-dux-shell.sh && \
+    bootc container lint

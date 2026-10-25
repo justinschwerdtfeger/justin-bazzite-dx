@@ -4,14 +4,27 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - 'Containerfile'
+      - 'build_files/**'
+      - 'system_files/**'
+      - '.github/workflows/build.yml'
   schedule:
     - cron: '05 10 * * *'  # 10:05am UTC everyday
   push:
     branches:
       - main
-    paths-ignore:
-      - '**/README.md'
+    paths:
+      - 'Containerfile'
+      - 'build_files/**'
+      - 'system_files/**'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
+    inputs:
+      fresh-build:
+        description: 'Ignore cached build layers'
+        type: boolean
+        default: false
 
 env:
   IMAGE_DESC: "My Customized Universal Blue Image"
@@ -22,13 +35,20 @@ env:
   DEFAULT_TAG: "latest"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}-${{ inputs.brand_name}}-${{ inputs.stream_name }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build_push:
-    name: Build and push image
+    name: Build and push ${{ matrix.desktop }} + niri
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        desktop: [gnome, kde]
+    env:
+      DESKTOP: ${{ matrix.desktop }}
 
     permissions:
       contents: read
@@ -38,31 +58,48 @@ jobs:
     steps:
       - name: Prepare environment
         run: |
+          # Build each desktop once; publish the unsuffixed GNOME alias below.
+          IMAGE_ALIAS=""
+          if [[ "$DESKTOP" == gnome ]]; then IMAGE_ALIAS="${IMAGE_NAME,,}"; fi
+          IMAGE_NAME+="-$DESKTOP"
           # Lowercase the image uri
-          echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
-          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+          {
+            echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}"
+            echo "IMAGE_NAME=${IMAGE_NAME,,}"
+            echo "IMAGE_ALIAS=$IMAGE_ALIAS"
+          } >> "$GITHUB_ENV"
 
       # These stage versions are pinned by https://github.com/renovatebot/renovate
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # You only use this action if the container-storage-action proves to be unreliable, you don't need to enable both
-      # This is optional, but if you see that your builds are way too big for the runners, you can enable this by uncommenting the following lines:
+      - name: Check shell scripts
+        run: shellcheck build_files/*.sh build_files/packages/*.sh system_files/usr/libexec/dux-niri-setup
+
       - name: Maximize build space
         uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
         with:
           remove-codeql: true
 
-      # - name: Mount BTRFS for podman storage
-      #   id: container-storage-action
-      #   uses: ublue-os/container-storage-action@911baca08baf30c8654933e9e9723cb399892140
-
-      #   # Fallback to the remove-unwanted-software-action if github doesn't allocate enough space
-      #   # See: https://github.com/ublue-os/container-storage-action/pull/11
-      #   continue-on-error: true 
-      #   with:
-      #     target-dir: /var/lib/containers
-      #     mount-opts: compress-force=zstd:2
+      # Use rootful native overlay rather than the build action's automatic
+      # fuse-overlayfs override. Linting and committing a large OS image can
+      # otherwise spend many minutes traversing its filesystem.
+      - name: Configure container storage
+        run: |
+          STORAGE_CONFIG="$RUNNER_TEMP/storage.conf"
+          cat > "$STORAGE_CONFIG" <<EOF
+          [storage]
+          driver = "overlay"
+          runroot = "$RUNNER_TEMP/containers-run"
+          graphroot = "$RUNNER_TEMP/containers-storage"
+          [storage.options.overlay]
+          mount_program = ""
+          EOF
+          echo "CONTAINERS_STORAGE_CONF=$STORAGE_CONFIG" >> "$GITHUB_ENV"
+          echo "REGISTRY_AUTH_FILE=$RUNNER_TEMP/registry-auth.json" >> "$GITHUB_ENV"
+          install -m 600 /dev/null "$RUNNER_TEMP/registry-auth.json"
+          echo '{"auths":{}}' > "$RUNNER_TEMP/registry-auth.json"
+          sudo env CONTAINERS_STORAGE_CONF="$STORAGE_CONFIG" buildah info
 
       - name: Get current date
         id: date
@@ -71,12 +108,14 @@ jobs:
           # E.G: 2022-02-08T15:38:15Z'
           # https://artifacthub.io/docs/topics/repositories/container-images/
           # https://linux.die.net/man/1/date
-          echo "date=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)" >> $GITHUB_OUTPUT
+          echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          # Invalidate package installation daily, including scheduled builds.
+          echo "package_refresh=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
 
       # Image metadata for https://artifacthub.io/ - This is optional but is highly recommended so we all can get a index of all the custom images
       # The metadata by itself is not going to do anything, you choose if you want your image to be on ArtifactHub or not.
       - name: Image Metadata
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         id: metadata
         with:
           # This generates all the tags for your image, you can add custom tags here too!
@@ -88,13 +127,13 @@ jobs:
             type=sha,enable=${{ github.event_name == 'pull_request' }}
             type=ref,event=pr
           labels: |
-            io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md
+            io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/README.md
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
             org.opencontainers.image.description=${{ env.IMAGE_DESC }}
-            org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md
-            org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/blob/${{ github.sha }}/Containerfile
+            org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/README.md
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}/blob/${{ github.sha }}/Containerfile
             org.opencontainers.image.title=${{ env.IMAGE_NAME }}
-            org.opencontainers.image.url=https://github.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/tree/${{ github.sha }}
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}/tree/${{ github.sha }}
             org.opencontainers.image.vendor=${{ github.repository_owner }}
             org.opencontainers.image.version=${{ env.DEFAULT_TAG }}.{{date 'YYYYMMDD'}}
             io.artifacthub.package.deprecated=false
@@ -106,66 +145,83 @@ jobs:
           sep-tags: " "
           sep-annotations: " "
 
-      - name: Build Image
-        id: build_image
-        uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056 # v2
-        with:
-          containerfiles: |
-            ./Containerfile
-          # Postfix image name with -custom to make it a little more descriptive
-          # Syntax: https://docs.github.com/en/actions/learn-github-actions/expressions#format
-          image: ${{ env.IMAGE_NAME }}
-          tags: ${{ steps.metadata.outputs.tags }}
-          labels: ${{ steps.metadata.outputs.labels }}
-          oci: false
-
-      # Rechunk is a script that we use on Universal Blue to make sure there isnt a single huge layer when your image gets published.
-      # This does not make your image faster to download, just provides better resumability and fixes a few errors.
-      # Documentation for Rechunk is provided on their github repository at https://github.com/hhd-dev/rechunk
-      # You can enable it by uncommenting the following lines:
-      # - name: Run Rechunker
-      #   id: rechunk
-      #   uses: hhd-dev/rechunk@f153348d8100c1f504dec435460a0d7baf11a9d2 # v1.1.1
-      #   with:
-      #     rechunk: 'ghcr.io/hhd-dev/rechunk:v1.0.1'
-      #     ref: "localhost/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}"
-      #     prev-ref: "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}"
-      #     skip_compression: true
-      #     version: ${{ env.CENTOS_VERSION }}
-      #     labels: ${{ steps.metadata.outputs.labels }} # Rechunk strips out all the labels during build, this needs to be reapplied here with newline separator
-
-      # This is necessary so that the podman socket can find the rechunked image on its storage
-      # - name: Load in podman and tag
-      #   run: |
-      #     IMAGE=$(podman pull ${{ steps.rechunk.outputs.ref }})
-      #     sudo rm -rf ${{ steps.rechunk.outputs.output }}
-      #     for tag in ${{ steps.metadata.outputs.tags }}; do
-      #       podman tag $IMAGE ${{ env.IMAGE_NAME }}:$tag
-      #     done
-
-      # These `if` statements are so that pull requests for your custom images do not make it publish any packages under your name without you knowing
-      # They also check if the runner is on the default branch so that things like the merge queue (if you enable it), are going to work
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v3
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        # Same-repository PRs can also read a private cache package.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Cosign reads Docker's credentials, not Buildah's auth file.
+          printf '%s' "$REGISTRY_PASSWORD" | docker login \
+            --username "$REGISTRY_USER" --password-stdin ghcr.io
+          printf '%s' "$REGISTRY_PASSWORD" | sudo buildah login \
+            --authfile "$REGISTRY_AUTH_FILE" \
+            --username "$REGISTRY_USER" --password-stdin ghcr.io
+
+      - name: Build Image
+        env:
+          IMAGE_LABELS: ${{ steps.metadata.outputs.labels }}
+          IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
+          PACKAGE_REFRESH: ${{ steps.date.outputs.package_refresh }}
+          FRESH_BUILD: ${{ inputs.fresh-build == true }}
+          PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+          USE_CACHE: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          BUILD_ARGS=(--layers --pull=always --format=docker)
+          BUILD_ARGS+=(--platform linux/amd64 --build-arg "DESKTOP=$DESKTOP")
+          BUILD_ARGS+=(--build-arg "PACKAGE_REFRESH=$PACKAGE_REFRESH")
+          BUILD_ARGS+=(--build-arg "DUX_SHELL_REFRESH=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}")
+          # Invalidate only the layer that uses each mounted script.
+          BUILD_ARGS+=(--build-arg "PACKAGE_SCRIPT_SHA=$(sha256sum build_files/build.sh build_files/packages/*.sh | sha256sum | cut -d ' ' -f 1)")
+          BUILD_ARGS+=(--build-arg "INITRAMFS_SCRIPT_SHA=$(sha256sum build_files/build-initramfs.sh | cut -d ' ' -f 1)")
+          # Preserve the existing GNOME cache when adding its canonical name.
+          CACHE_IMAGE="$IMAGE_REGISTRY/${IMAGE_ALIAS:-$IMAGE_NAME}-build-cache"
+          if [[ "$FRESH_BUILD" == true ]]; then
+            BUILD_ARGS+=(--no-cache)
+          elif [[ "$USE_CACHE" == true ]]; then
+            BUILD_ARGS+=(--cache-from "$CACHE_IMAGE" --cache-ttl=48h)
+          fi
+          # Only default-branch builds may write the shared cache.
+          if [[ "$PUBLISH" == true ]]; then
+            BUILD_ARGS+=(--cache-to "$CACHE_IMAGE")
+          fi
+          while IFS= read -r label; do
+            [[ -z "$label" ]] || BUILD_ARGS+=(--label "$label")
+          done <<< "$IMAGE_LABELS"
+          read -r -a TAGS <<< "$IMAGE_TAGS"
+          for tag in "${TAGS[@]}"; do
+            BUILD_ARGS+=(--tag "$IMAGE_NAME:$tag")
+          done
+          sudo env CONTAINERS_STORAGE_CONF="$CONTAINERS_STORAGE_CONF" \
+            REGISTRY_AUTH_FILE="$REGISTRY_AUTH_FILE" \
+            buildah build "${BUILD_ARGS[@]}" --file Containerfile .
 
       - name: Push To GHCR
-        uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c # v2
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         id: push
         env:
-          REGISTRY_USER: ${{ github.actor }}
-          REGISTRY_PASSWORD: ${{ github.token }}
-        with:
-          registry: ${{ env.IMAGE_REGISTRY }}
-          image: ${{ env.IMAGE_NAME }}
-          tags: ${{ steps.metadata.outputs.tags }}
-          username: ${{ env.REGISTRY_USER }}
-          password: ${{ env.REGISTRY_PASSWORD }}
+          IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
+        run: |
+          read -r -a TAGS <<< "$IMAGE_TAGS"
+          NAMES=("$IMAGE_NAME")
+          if [[ -n "$IMAGE_ALIAS" ]]; then NAMES+=("$IMAGE_ALIAS"); fi
+          for name in "${NAMES[@]}"; do
+            for tag in "${TAGS[@]}"; do
+              sudo env CONTAINERS_STORAGE_CONF="$CONTAINERS_STORAGE_CONF" \
+                REGISTRY_AUTH_FILE="$REGISTRY_AUTH_FILE" \
+                buildah push --digestfile "$RUNNER_TEMP/image-digest.txt" \
+                "$IMAGE_NAME:$tag" "docker://$IMAGE_REGISTRY/$name:$tag"
+              # Both GNOME names must resolve to exactly the same manifest.
+              digest=$(cat "$RUNNER_TEMP/image-digest.txt")
+              if [[ -n "${expected_digest:-}" && "$digest" != "$expected_digest" ]]; then
+                echo "Digest mismatch publishing $name:$tag" >&2
+                exit 1
+              fi
+              expected_digest="$digest"
+            done
+          done
+          echo "digest=$expected_digest" >> "$GITHUB_OUTPUT"
 
       # This section is optional and only needs to be enabled if you plan on distributing
       # your project for others to consume. You will need to create a public and private key
@@ -178,11 +234,12 @@ jobs:
       - name: Sign container image
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         run: |
-          IMAGE_FULL="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}"
-          for tag in ${{ steps.metadata.outputs.tags }}; do
-            cosign sign -y --key env://COSIGN_PRIVATE_KEY $IMAGE_FULL:$tag
-          done
+          cosign sign -y --key env://COSIGN_PRIVATE_KEY "$IMAGE_FULL@$IMAGE_DIGEST"
+          if [[ -n "$IMAGE_ALIAS" ]]; then
+            cosign sign -y --key env://COSIGN_PRIVATE_KEY "$IMAGE_REGISTRY/$IMAGE_ALIAS@$IMAGE_DIGEST"
+          fi
         env:
-          TAGS: ${{ steps.push.outputs.digest }}
+          IMAGE_FULL: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
           COSIGN_EXPERIMENTAL: false
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
