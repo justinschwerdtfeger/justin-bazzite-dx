@@ -30,13 +30,22 @@ Actions token read/write access if a package with that name already exists.
 
 The workflow always checks for a newer base image. A daily cache key forces
 package installations to run again each UTC day, so scheduled builds still pick
-up package updates. Changes to build scripts also invalidate package layers;
-artwork changes rerun initramfs generation without reinstalling packages. Choose
+up package updates. Only `build_files/build.sh` changes invalidate the package
+script's cache key. The scripts have separate build contexts so edits to the shell
+installer or initramfs script can reuse installed packages. Artwork and initramfs
+script changes rerun initramfs generation without reinstalling packages. Choose
 **fresh-build** when running the workflow manually to ignore all cached layers.
 The first build populates the cache and may take longer; subsequent builds on the
-same day can reuse it when the base and inputs match. Package installs are grouped
-to reduce repeated transactions, and the published digest is signed once for all
-its tags. Changes outside the image inputs no longer trigger container builds.
+same day can reuse it when the base and inputs match.
+
+Package installs are grouped by repository availability to reduce repeated DNF
+transactions. Each Copr remains enabled only for its own packages, and Terra is
+disabled for the remaining development tools. The prebuilt Dux Shell is refreshed
+on every build, after initramfs generation so the initramfs layer can be reused
+when the base, packages, and artwork match. The final shell install and
+`bootc container lint` share a layer, avoiding a separate filesystem scan/commit
+for linting. The published digest is signed once for all its tags. Changes outside
+the image inputs no longer trigger container builds.
 
 This repository is meant to be a template for building your own custom [bootc](https://github.com/bootc-dev/bootc) image. This template is the recommended way to make customizations to any image published by the Universal Blue Project.
 

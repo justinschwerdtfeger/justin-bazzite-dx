@@ -1,6 +1,13 @@
-# Allow build scripts to be referenced without being copied into the final image
-FROM scratch AS ctx
-COPY build_files /
+# Keep script contexts separate so shell/initramfs edits don't invalidate packages.
+# Bind mounts keep the scripts out of the final image.
+FROM scratch AS packages_ctx
+COPY build_files/build.sh /
+
+FROM scratch AS initramfs_ctx
+COPY build_files/build-initramfs.sh /
+
+FROM scratch AS shell_ctx
+COPY build_files/install-dux-shell.sh /
 
 # Base Image
 FROM ghcr.io/ublue-os/bazzite-dx-gnome:stable-44
@@ -31,31 +38,30 @@ RUN rm /opt && mkdir /opt
 
 # CI changes this daily so cached package installs still receive repository updates.
 ARG PACKAGE_REFRESH=local
-ARG BUILD_SCRIPTS_SHA=local
-RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+ARG PACKAGE_SCRIPT_SHA=local
+RUN --mount=type=bind,from=packages_ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
-    test -n "$PACKAGE_REFRESH" && test -n "$BUILD_SCRIPTS_SHA" && \
+    test -n "$PACKAGE_REFRESH" && test -n "$PACKAGE_SCRIPT_SHA" && \
     /ctx/build.sh
-
-# Refresh the prebuilt shell on every build without reinstalling packages.
-# CI and `just build` supply a fresh value for this layer's cache key.
-ARG DUX_SHELL_REFRESH=local
-RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
-    --mount=type=tmpfs,dst=/tmp \
-    test -n "$DUX_SHELL_REFRESH" && bash /ctx/install-dux-shell.sh
 
 # Artwork changes can reuse package installation. Copy before dracut so the
 # custom Plymouth artwork is included in the generated initramfs.
 COPY system_files /
 
-RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+ARG INITRAMFS_SCRIPT_SHA=local
+RUN --mount=type=bind,from=initramfs_ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
-    /ctx/build-initramfs.sh
+    test -n "$INITRAMFS_SCRIPT_SHA" && /ctx/build-initramfs.sh
 
-### LINTING
-## Verify final image and contents are correct.
-RUN bootc container lint
+# Refresh the prebuilt shell after dracut so it doesn't invalidate the initramfs.
+# CI and `just build` supply a fresh value for this layer's cache key.
+# Lint in the same RUN to avoid another filesystem scan/commit of the OS image.
+ARG DUX_SHELL_REFRESH=local
+RUN --mount=type=bind,from=shell_ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/tmp \
+    test -n "$DUX_SHELL_REFRESH" && bash /ctx/install-dux-shell.sh && \
+    bootc container lint
