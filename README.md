@@ -15,9 +15,10 @@ update manually.
 
 ## DMS application theming
 
-The image includes `qt5ct`, `qt6ct`, both Qt5 and Qt6 plugins for
-[`qtengine`](https://github.com/kossLAN/qtengine), and the
-[`pywalfox`](https://github.com/Frewacom/pywalfox) native helper.
+The image includes `qt5ct`, `qt6ct`, and both Qt5 and Qt6 plugins for
+[`qtengine`](https://github.com/kossLAN/qtengine). The qtengine RPM comes from
+the [desertedman/qtengine Copr](https://copr.fedorainfracloud.org/coprs/desertedman/qtengine/),
+which is enabled only for its installation.
 
 To use qtengine in your DMS session, set `QT_QPA_PLATFORMTHEME=qtengine` in
 `~/.config/environment.d/90-dms.conf`, then log out and back in. Enable **Apply Qt
@@ -25,12 +26,6 @@ Themes** in DMS's **Theme & Colors** settings. You can instead select `qt5ct` or
 `qt6ct` in your session configuration. See the
 [DMS application theming guide](https://duxlabs.dev/docs/dankmaterialshell/application-themes/)
 for compositor configuration and other options.
-
-For Firefox, install the
-[Pywalfox add-on](https://addons.mozilla.org/en-US/firefox/addon/pywalfox/) and
-restart Firefox. Enable Pywalfox in DMS's **Theme & Colors** settings to sync its
-generated colors. The native helper and Firefox manifest are installed
-system-wide; no user-level pip installation or `pywalfox install` is needed.
 
 ## Build performance
 
