@@ -58,11 +58,16 @@ jobs:
     steps:
       - name: Prepare environment
         run: |
-          # GNOME retains its existing package name; KDE gets a separate one.
-          if [[ "$DESKTOP" == kde ]]; then IMAGE_NAME+="-kde"; fi
+          # Build each desktop once; publish the unsuffixed GNOME alias below.
+          IMAGE_ALIAS=""
+          if [[ "$DESKTOP" == gnome ]]; then IMAGE_ALIAS="${IMAGE_NAME,,}"; fi
+          IMAGE_NAME+="-$DESKTOP"
           # Lowercase the image uri
-          echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> "$GITHUB_ENV"
-          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "$GITHUB_ENV"
+          {
+            echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}"
+            echo "IMAGE_NAME=${IMAGE_NAME,,}"
+            echo "IMAGE_ALIAS=$IMAGE_ALIAS"
+          } >> "$GITHUB_ENV"
 
       # These stage versions are pinned by https://github.com/renovatebot/renovate
       - name: Checkout
@@ -170,7 +175,8 @@ jobs:
           # Invalidate only the layer that uses each mounted script.
           BUILD_ARGS+=(--build-arg "PACKAGE_SCRIPT_SHA=$(sha256sum build_files/build.sh build_files/packages/*.sh | sha256sum | cut -d ' ' -f 1)")
           BUILD_ARGS+=(--build-arg "INITRAMFS_SCRIPT_SHA=$(sha256sum build_files/build-initramfs.sh | cut -d ' ' -f 1)")
-          CACHE_IMAGE="$IMAGE_REGISTRY/$IMAGE_NAME-build-cache"
+          # Preserve the existing GNOME cache when adding its canonical name.
+          CACHE_IMAGE="$IMAGE_REGISTRY/${IMAGE_ALIAS:-$IMAGE_NAME}-build-cache"
           if [[ "$FRESH_BUILD" == true ]]; then
             BUILD_ARGS+=(--no-cache)
           elif [[ "$USE_CACHE" == true ]]; then
@@ -198,13 +204,24 @@ jobs:
           IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
         run: |
           read -r -a TAGS <<< "$IMAGE_TAGS"
-          for tag in "${TAGS[@]}"; do
-            sudo env CONTAINERS_STORAGE_CONF="$CONTAINERS_STORAGE_CONF" \
-              REGISTRY_AUTH_FILE="$REGISTRY_AUTH_FILE" \
-              buildah push --digestfile "$RUNNER_TEMP/image-digest.txt" \
-              "$IMAGE_NAME:$tag" "docker://$IMAGE_REGISTRY/$IMAGE_NAME:$tag"
+          NAMES=("$IMAGE_NAME")
+          if [[ -n "$IMAGE_ALIAS" ]]; then NAMES+=("$IMAGE_ALIAS"); fi
+          for name in "${NAMES[@]}"; do
+            for tag in "${TAGS[@]}"; do
+              sudo env CONTAINERS_STORAGE_CONF="$CONTAINERS_STORAGE_CONF" \
+                REGISTRY_AUTH_FILE="$REGISTRY_AUTH_FILE" \
+                buildah push --digestfile "$RUNNER_TEMP/image-digest.txt" \
+                "$IMAGE_NAME:$tag" "docker://$IMAGE_REGISTRY/$name:$tag"
+              # Both GNOME names must resolve to exactly the same manifest.
+              digest=$(cat "$RUNNER_TEMP/image-digest.txt")
+              if [[ -n "${expected_digest:-}" && "$digest" != "$expected_digest" ]]; then
+                echo "Digest mismatch publishing $name:$tag" >&2
+                exit 1
+              fi
+              expected_digest="$digest"
+            done
           done
-          echo "digest=$(cat "$RUNNER_TEMP/image-digest.txt")" >> "$GITHUB_OUTPUT"
+          echo "digest=$expected_digest" >> "$GITHUB_OUTPUT"
 
       # This section is optional and only needs to be enabled if you plan on distributing
       # your project for others to consume. You will need to create a public and private key
@@ -218,6 +235,9 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         run: |
           cosign sign -y --key env://COSIGN_PRIVATE_KEY "$IMAGE_FULL@$IMAGE_DIGEST"
+          if [[ -n "$IMAGE_ALIAS" ]]; then
+            cosign sign -y --key env://COSIGN_PRIVATE_KEY "$IMAGE_REGISTRY/$IMAGE_ALIAS@$IMAGE_DIGEST"
+          fi
         env:
           IMAGE_FULL: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
           IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
