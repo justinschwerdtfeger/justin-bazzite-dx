@@ -13,6 +13,21 @@ Reboot when ready, then check `sudo bootc status` to confirm the booted image.
 Future updates follow the registry image again; `sudo bootc upgrade` stages an
 update manually.
 
+## Niri with Dux Shell
+
+Select **Niri** at the login screen after installing this image or rebasing to it
+and rebooting. First login initializes `~/.config/niri` (or
+`$XDG_CONFIG_HOME/niri`) with Dux Shell defaults. Existing Niri paths and
+`NIRI_CONFIG` overrides are preserved; image updates leave user settings alone.
+To switch an existing setup, run `dms setup`, which backs up its configuration.
+
+Each image build uses the installed Niri package's defaults with Dux Shell
+integration. Navigation shortcuts and application window rules follow upstream.
+
+Shortcuts: **Super+Space** opens the launcher, **Super+Return** opens Foot,
+**Super+Ctrl+Comma** opens settings, **Super+Ctrl+V** opens the clipboard,
+and **Super+Alt+L** locks the screen.
+
 ## DMS application theming
 
 The image includes `qt5ct`, `qt6ct`, and both Qt5 and Qt6 plugins for

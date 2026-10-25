@@ -1,0 +1,24 @@
+include "upstream.kdl"
+
+spawn-at-startup "systemctl" "--user" "start" "dms.service"
+
+prefer-no-csd
+hotkey-overlay {
+    skip-at-startup
+}
+
+layer-rule {
+    match namespace="^quickshell$"
+    place-within-backdrop true
+}
+
+// Dux Shell generates the optional fragments after startup.
+include optional=true "dms/colors.kdl"
+include optional=true "dms/layout.kdl"
+include optional=true "dms/alttab.kdl"
+include "dms/binds.kdl"
+include optional=true "dms/outputs.kdl"
+include optional=true "dms/cursor.kdl"
+include optional=true "dms/input.kdl"
+include optional=true "dms/windowrules.kdl"
+include optional=true "dms/wpblur.kdl"
