@@ -2,48 +2,84 @@
 
 set -ouex pipefail
 
+if [[ "$(uname -m)" != x86_64 ]]; then
+  echo "The Dux Shell prebuilt release only supports Linux x86_64." >&2
+  exit 1
+fi
+
+case "${DESKTOP:-gnome}" in
+  gnome|kde) ;;
+  *) echo "Unsupported desktop: $DESKTOP (expected gnome or kde)" >&2; exit 1 ;;
+esac
+script_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+# shellcheck source=build_files/packages/gnome.sh
+source "$script_dir/packages/${DESKTOP:-gnome}.sh"
+
 ### Install packages
+
+# Install browsers and monitoring tools in one transaction.
+dnf5 -y install firefox wireshark iotop
+rpm -q firefox
 
 # Packages can be installed from any enabled yum repo on the image.
 # RPMfusion repos are available by default in ublue main images
 # List of rpmfusion packages can be found here:
 # https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/39/x86_64/repoview/index.html&protocol=https&redirect=1
 
-# Install DMS
-# dnf5 -y copr enable avengemedia/dms
-# dnf5 -y install dms
-# dnf5 -y copr disable avengemedia/dms
+# Dux Shell uses the prebuilt custom release; keep its runtime dependencies.
+dnf5 -y copr enable avengemedia/danklinux
+dnf5 -y config-manager setopt terra.enabled=0
+dnf5 -y --refresh install \
+  cava \
+  dankcalendar-git \
+  dgop \
+  danksearch \
+  matugen \
+  quickshell \
+  accountsservice \
+  wl-mirror \
+  curl \
+  jq \
+  tar \
+  gzip \
+  qt6-qtmultimedia
+# Niri is installed below from yalter/niri.
+rpm -q quickshell accountsservice cava dankcalendar-git dgop danksearch matugen qt6-qtmultimedia
+dnf5 -y copr disable avengemedia/danklinux
+
+# Install development tools and desktop utilities with Terra and the added Coprs
+# disabled. One transaction avoids repeating dependency solving and RPM setup.
+dnf5 -y install \
+  gcc gcc-c++ make ncurses xz perl \
+  wlsunset \
+  ripgrep fd-find tree-sitter-cli neovim python3-neovim \
+  pipx python3-devel \
+  qt5ct qt6ct \
+  brightnessctl \
+  foot wl-clipboard \
+  xdg-desktop-portal-gtk xdg-desktop-portal-gnome gnome-keyring \
+  wget file
+# Niri shares the screen-sharing portal and keyring on both desktops.
+# File managers and the file chooser backend follow the desktop variant.
+if (( ${#DESKTOP_PACKAGES[@]} )); then
+  dnf5 -y install "${DESKTOP_PACKAGES[@]}"
+fi
+dnf5 -y group install "c-development"
+
+# Install the packaged Qt5 and Qt6 theme plugins from Copr.
+dnf5 -y copr enable desertedman/qtengine
+dnf5 -y install qtengine
+rpm -q qt5ct qt6ct qtengine
+dnf5 -y copr disable desertedman/qtengine
+
+# Terra packages share a transaction; keep Terra disabled for other installs.
+dnf5 -y config-manager setopt terra.enabled=1
+dnf5 -y install noctalia cliphist cursor
+dnf5 -y config-manager setopt terra.enabled=0
 
 dnf5 -y copr enable daniel-g-carrasco/wayland-scroll-factor
 dnf5 -y install wayland-scroll-factor
 dnf5 -y copr disable daniel-g-carrasco/wayland-scroll-factor
-
-# Install Cursor
-dnf5 -y config-manager setopt terra.enabled=1
-dnf5 -y install cursor
-dnf5 -y config-manager setopt terra.enabled=0
-
-# Install Noctalia Shell
-dnf5 -y config-manager setopt terra.enabled=1
-dnf5 -y install noctalia-shell
-dnf5 -y install cliphist # For clipboard History
-dnf5 -y config-manager setopt terra.enabled=0
-
-# Install haskell dependencies
-dnf5 -y install gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl
-
-# Install wlsunset for Night light
-dnf5 -y install wlsunset
-
-# Install lazygit dependencies
-dnf5 -y install ripgrep
-dnf5 -y install fd-find
-dnf5 -y install tree-sitter-cli
-dnf5 -y install neovim python3-neovim
-
-# Install pipx for brotab (tab search)
-dnf5 -y install pipx
-dnf5 -y install python3-devel
 
 # Install Vicinae from Copr
 dnf5 -y copr enable quadratech188/vicinae
@@ -52,7 +88,7 @@ dnf5 -y copr disable quadratech188/vicinae
 
 # Install Niri from Copr
 dnf5 -y copr enable yalter/niri
-dnf5 -y install niri
+dnf5 -y install niri xwayland-satellite
 dnf5 -y copr disable yalter/niri
 
 # Install Keyd from Copr
@@ -60,53 +96,21 @@ dnf5 -y copr enable alternateved/keyd
 dnf5 -y install keyd
 dnf5 -y copr disable alternateved/keyd
 
-# Install Niri Dependencies
-dnf5 -y install brightnessctl
-dnf5 -y install fuzzel
-dnf5 -y install mako
-dnf5 -y install waybar
-dnf5 -y install swaybg
-dnf5 -y install swayidle
-
 # Install Google Chrome
 dnf5 config-manager addrepo --id="google-chrome" \
   --set=name="Google Chrome" \
   --set=baseurl="https://dl.google.com/linux/chrome/rpm/stable/x86_64" \
   --set=gpgkey="https://dl.google.com/linux/linux_signing_key.pub" \
   --set=gpgcheck=1
-dnf5 makecache
+# install fetches the new repo's metadata on demand.
 dnf5 -y install google-chrome-stable
 dnf5 config-manager setopt google-chrome.enabled=0
 
-# # Dank Material Shell
-# dnf5 -y copr enable avengemedia/dms
-# dnf5 -y copr enable avengemedia/danklinux
-# dnf5 -y install cliphist # For clipboard History
-# dnf5 -y install dgop # For Resource monitoring
-# dnf5 -y install danksearch # For File Search
-# dnf5 -y install material-symbols-fonts # For DMS Font
-# dnf5 -y install matugen # For Theme
-# dnf5 -y install wl-mirror # For screen mirror
-# dnf5 -y install qt6-qtmultimedia
-# dnf5 -y install dms
-# dnf5 -y copr disable avengemedia/danklinux
-# dnf5 -y copr disable avengemedia/dms
 
 # Global Protect Open Connect for UTD-VPN
 dnf5 -y copr enable yuezk/globalprotect-openconnect
 dnf5 -y install globalprotect-openconnect
 dnf5 -y copr disable yuezk/globalprotect-openconnect
-
-# Install Tauri Dependencies
-dnf5 -y install webkit2gtk4.1-devel \
-  openssl-devel \
-  curl \
-  wget \
-  file \
-  libappindicator-gtk3-devel \
-  librsvg2-devel \
-  libxdo-devel
-dnf5 -y group install "c-development"
 
 dnf5 -y copr enable dejan/lazygit
 dnf5 -y install lazygit
@@ -115,3 +119,7 @@ dnf5 -y copr disable dejan/lazygit
 #### Example for enabling a System Unit File
 
 systemctl enable podman.socket
+
+if (( ${#DESKTOP_REMOVE_PACKAGES[@]} )); then
+  dnf5 -y remove "${DESKTOP_REMOVE_PACKAGES[@]}"
+fi

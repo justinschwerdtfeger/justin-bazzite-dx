@@ -1,4 +1,6 @@
-export image_name := env("IMAGE_NAME", "justin-bazzite-dx") # output image name, usually same as repo name, change as needed
+# DESKTOP selects defaults; the third positional argument can override it.
+export desktop := env("DESKTOP", "gnome")
+export image_name := env("IMAGE_NAME", "justin-bazzite-dx-" + desktop)
 export default_tag := env("DEFAULT_TAG", "latest")
 export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest")
 
@@ -14,6 +16,7 @@ default:
 [group('Just')]
 check:
     #!/usr/bin/bash
+    set -euo pipefail
     find . -type f -name "*.just" | while read -r file; do
     	echo "Checking syntax: $file"
     	just --unstable --fmt --check -f $file
@@ -25,6 +28,7 @@ check:
 [group('Just')]
 fix:
     #!/usr/bin/bash
+    set -euo pipefail
     find . -type f -name "*.just" | while read -r file; do
     	echo "Checking syntax: $file"
     	just --unstable --fmt -f $file
@@ -42,7 +46,7 @@ clean:
     rm -f previous.manifest.json
     rm -f changelog.md
     rm -f output.env
-    rm -f output/
+    rm -rf output/
 
 # Sudo Clean Repo
 [group('Utility')]
@@ -68,173 +72,117 @@ sudoif command *args:
     }
     sudoif {{ command }} {{ args }}
 
-# This Justfile recipe builds a container image using Podman.
-#
-# Arguments:
-#   $target_image - The tag you want to apply to the image (default: $image_name).
-#   $tag - The tag for the image (default: $default_tag).
-#
-# The script constructs the version string using the tag and the current date.
-# If the git working directory is clean, it also includes the short SHA of the current HEAD.
-#
-# just build $target_image $tag
-#
-# Example usage:
-#   just build aurora lts
-#
-# This will build an image 'aurora:lts' with DX and GDX enabled.
-#
-
-# Build the image using the specified parameters
-build $target_image=image_name $tag=default_tag:
+# Build an image; existing target_image/tag positions are unchanged.
+# Examples: just build; DESKTOP=kde just build; just build my-kde latest kde
+build $target_image=image_name $tag=default_tag $variant=desktop:
     #!/usr/bin/env bash
+    set -euo pipefail
+    case "$variant" in
+        gnome|kde) ;;
+        *) echo "Unsupported desktop: $variant (expected gnome or kde)" >&2; exit 1 ;;
+    esac
+    [[ $(uname -m) == x86_64 ]] || { echo "Dux Shell requires x86_64." >&2; exit 1; }
 
     BUILD_ARGS=()
     if [[ -z "$(git status -s)" ]]; then
         BUILD_ARGS+=("--build-arg" "SHA_HEAD_SHORT=$(git rev-parse --short HEAD)")
     fi
+    # Buildah/Podman bind contexts need an explicit content hash in the cache key.
+    PACKAGE_SCRIPT_SHA=$(sha256sum build_files/build.sh build_files/packages/*.sh | sha256sum | cut -d ' ' -f 1)
+    INITRAMFS_SCRIPT_SHA=$(sha256sum build_files/build-initramfs.sh | cut -d ' ' -f 1)
 
     podman build \
         "${BUILD_ARGS[@]}" \
+        --platform linux/amd64 \
         --pull=newer \
+        --build-arg "DESKTOP=$variant" \
+        --build-arg "PACKAGE_REFRESH=$(date -u +%Y%m%d)" \
+        --build-arg "DUX_SHELL_REFRESH=$(date -u +%s%N)" \
+        --build-arg "PACKAGE_SCRIPT_SHA=$PACKAGE_SCRIPT_SHA" \
+        --build-arg "INITRAMFS_SCRIPT_SHA=$INITRAMFS_SCRIPT_SHA" \
         --tag "${target_image}:${tag}" \
         .
 
-# Command: _rootful_load_image
-# Description: This script checks if the current user is root or running under sudo. If not, it attempts to resolve the image tag using podman inspect.
-#              If the image is found, it loads it into rootful podman. If the image is not found, it pulls it from the repository.
-#
-# Parameters:
-#   $target_image - The name of the target image to be loaded or pulled.
-#   $tag - The tag of the target image to be loaded or pulled. Default is 'default_tag'.
-#
-# Example usage:
-#   _rootful_load_image my_image latest
-#
-# Steps:
-# 1. Check if the script is already running as root or under sudo.
-# 2. Check if target image is in the non-root podman container storage)
-# 3. If the image is found, load it into rootful podman using podman scp.
-# 4. If the image is not found, pull it from the remote repository into reootful podman.
-
+# BIB runs rootful and must see the local image. A stream avoids SSH/scp setup.
 _rootful_load_image $target_image=image_name $tag=default_tag:
-    #!/usr/bin/bash
-    set -eoux pipefail
-
-    # Check if already running as root or under sudo
-    if [[ -n "${SUDO_USER:-}" || "${UID}" -eq "0" ]]; then
-        echo "Already root or running under sudo, no need to load image from user podman."
-        exit 0
-    fi
-
-    # Try to resolve the image tag using podman inspect
-    set +e
-    resolved_tag=$(podman inspect -t image "${target_image}:${tag}" | jq -r '.[].RepoTags.[0]')
-    return_code=$?
-    set -e
-
-    USER_IMG_ID=$(podman images --filter reference="${target_image}:${tag}" --format "'{{ '{{.ID}}' }}'")
-
-    if [[ $return_code -eq 0 ]]; then
-        # If the image is found, load it into rootful podman
-        ID=$(just sudoif podman images --filter reference="${target_image}:${tag}" --format "'{{ '{{.ID}}' }}'")
-        if [[ "$ID" != "$USER_IMG_ID" ]]; then
-            # If the image ID is not found or different from user, copy the image from user podman to root podman
-            COPYTMP=$(mktemp -p "${PWD}" -d -t _build_podman_scp.XXXXXXXXXX)
-            just sudoif TMPDIR=${COPYTMP} podman image scp ${UID}@localhost::"${target_image}:${tag}" root@localhost::"${target_image}:${tag}"
-            rm -rf "${COPYTMP}"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if podman image exists "${target_image}:${tag}"; then
+        user_id=$(podman image inspect --format '{{ '{{.Id}}' }}' "${target_image}:${tag}")
+        root_id=$(just sudoif podman image inspect --format '{{ '{{.Id}}' }}' "${target_image}:${tag}" 2>/dev/null || true)
+        if [[ "$root_id" != "$user_id" ]]; then
+            podman save "${target_image}:${tag}" | just sudoif podman load
         fi
     else
-        # If the image is not found, pull it from the repository
         just sudoif podman pull "${target_image}:${tag}"
     fi
 
-# Build a bootc bootable image using Bootc Image Builder (BIB)
-# Converts a container image to a bootable image
-# Parameters:
-#   target_image: The name of the image to build (ex. localhost/fedora)
-#   tag: The tag of the image to build (ex. latest)
-#   type: The type of image to build (ex. qcow2, raw, iso)
-#   config: The configuration file to use for the build (default: disk_config/disk.toml)
-
-# Example: just _rebuild-bib localhost/fedora latest qcow2 disk_config/disk.toml
-_build-bib $target_image $tag $type $config: (_rootful_load_image target_image tag)
+# Convert a local image using the template's privileged Bootc Image Builder flow.
+_build-bib $target_image $tag $type $config $variant=desktop: (_rootful_load_image target_image tag)
     #!/usr/bin/env bash
     set -euo pipefail
-
-    args="--type ${type} "
-    args+="--use-librepo=True "
-    args+="--rootfs=btrfs"
-
+    case "$variant" in
+        gnome|kde) ;;
+        *) echo "Unsupported desktop: $variant (expected gnome or kde)" >&2; exit 1 ;;
+    esac
+    [[ $(uname -m) == x86_64 ]] || { echo "Dux Shell requires x86_64." >&2; exit 1; }
     BUILDTMP=$(mktemp -p "${PWD}" -d -t _build-bib.XXXXXXXXXX)
+    trap 'just sudoif rm -rf -- "$BUILDTMP"' EXIT
+    mkdir -p "$BUILDTMP/output"
+    config_path=$(realpath -e "$config")
 
-    sudo podman run \
-      --rm \
-      -it \
-      --privileged \
-      --pull=newer \
-      --net=host \
-      --security-opt label=type:unconfined_t \
-      -v $(pwd)/${config}:/config.toml:ro \
-      -v $BUILDTMP:/output \
-      -v /var/lib/containers/storage:/var/lib/containers/storage \
-      "${bib_image}" \
-      ${args} \
-      "${target_image}:${tag}"
+    just sudoif podman run \
+        --rm --privileged --pull=newer --net=host \
+        --security-opt label=type:unconfined_t \
+        -v "$config_path:/config.toml:ro" \
+        -v "$BUILDTMP/output:/output" \
+        -v /var/lib/containers/storage:/var/lib/containers/storage \
+        "$bib_image" build "${target_image}:${tag}" \
+        --type "$type" --config /config.toml --output /output --use-librepo --rootfs=btrfs \
+        --chown "${SUDO_UID:-$(id -u)}:${SUDO_GID:-$(id -g)}"
 
-    mkdir -p output
-    sudo mv -f $BUILDTMP/* output/
-    sudo rmdir $BUILDTMP
-    sudo chown -R $USER:$USER output/
+    output_dir="output/$variant/${target_image//\//_}/$tag"
+    mkdir -p "$output_dir"
+    just sudoif cp -a "$BUILDTMP/output/." "$output_dir/"
+    just sudoif chown -R "${SUDO_UID:-$(id -u)}:${SUDO_GID:-$(id -g)}" "$output_dir"
+    echo "Artifacts: $output_dir"
 
-# Podman builds the image from the Containerfile and creates a bootable image
-# Parameters:
-#   target_image: The name of the image to build (ex. localhost/fedora)
-#   tag: The tag of the image to build (ex. latest)
-#   type: The type of image to build (ex. qcow2, raw, iso)
-#   config: The configuration file to use for the build (deafult: disk_config/disk.toml)
+_rebuild-bib $target_image $tag $type $config $variant=desktop: (build target_image tag variant) && (_build-bib target_image tag type config variant)
 
-# Example: just _rebuild-bib localhost/fedora latest qcow2 disk_config/disk.toml
-_rebuild-bib $target_image $tag $type $config: (build target_image tag) && (_build-bib target_image tag type config)
+# Existing image/tag positional arguments remain first; desktop is third.
+[group('Build Virtual Machine Image')]
+build-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_build-bib target_image tag "qcow2" "disk_config/disk.toml" variant)
 
-# Build a QCOW2 virtual machine image
-[group('Build Virtal Machine Image')]
-build-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag: && (_build-bib target_image tag "qcow2" "disk_config/disk.toml")
+[group('Build Virtual Machine Image')]
+build-raw $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_build-bib target_image tag "raw" "disk_config/disk.toml" variant)
 
-# Build a RAW virtual machine image
-[group('Build Virtal Machine Image')]
-build-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_build-bib target_image tag "raw" "disk_config/disk.toml")
+[group('Build Virtual Machine Image')]
+build-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_build-bib target_image tag "anaconda-iso" ("disk_config/iso-" + variant + ".toml") variant)
 
-# Build an ISO virtual machine image
-[group('Build Virtal Machine Image')]
-build-iso $target_image=("localhost/" + image_name) $tag=default_tag: && (_build-bib target_image tag "iso" "disk_config/iso.toml")
+[group('Build Virtual Machine Image')]
+rebuild-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_rebuild-bib target_image tag "qcow2" "disk_config/disk.toml" variant)
 
-# Rebuild a QCOW2 virtual machine image
-[group('Build Virtal Machine Image')]
-rebuild-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag: && (_rebuild-bib target_image tag "qcow2" "disk_config/disk.toml")
+[group('Build Virtual Machine Image')]
+rebuild-raw $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_rebuild-bib target_image tag "raw" "disk_config/disk.toml" variant)
 
-# Rebuild a RAW virtual machine image
-[group('Build Virtal Machine Image')]
-rebuild-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_rebuild-bib target_image tag "raw" "disk_config/disk.toml")
-
-# Rebuild an ISO virtual machine image
-[group('Build Virtal Machine Image')]
-rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag: && (_rebuild-bib target_image tag "iso" "disk_config/iso.toml")
+[group('Build Virtual Machine Image')]
+rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_rebuild-bib target_image tag "anaconda-iso" ("disk_config/iso-" + variant + ".toml") variant)
 
 # Run a virtual machine with the specified image type and configuration
-_run-vm $target_image $tag $type $config:
+_run-vm $target_image $tag $type $config $variant=desktop:
     #!/usr/bin/bash
     set -eoux pipefail
 
     # Determine the image file based on the type
-    image_file="output/${type}/disk.${type}"
+    output_dir="output/$variant/${target_image//\//_}/$tag"
+    image_file="$output_dir/${type}/disk.${type}"
     if [[ $type == iso ]]; then
-        image_file="output/bootiso/install.iso"
+        image_file="$output_dir/bootiso/install.iso"
     fi
 
     # Build the image if it does not exist
     if [[ ! -f "${image_file}" ]]; then
-        just "build-${type}" "$target_image" "$tag"
+        just "build-${type}" "$target_image" "$tag" "$variant"
     fi
 
     # Determine an available port to use
@@ -265,34 +213,36 @@ _run-vm $target_image $tag $type $config:
 
 # Run a virtual machine from a QCOW2 image
 [group('Run Virtal Machine')]
-run-vm-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag: && (_run-vm target_image tag "qcow2" "disk_config/disk.toml")
+run-vm-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_run-vm target_image tag "qcow2" "disk_config/disk.toml" variant)
 
 # Run a virtual machine from a RAW image
 [group('Run Virtal Machine')]
-run-vm-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_run-vm target_image tag "raw" "disk_config/disk.toml")
+run-vm-raw $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_run-vm target_image tag "raw" "disk_config/disk.toml" variant)
 
 # Run a virtual machine from an ISO
 [group('Run Virtal Machine')]
-run-vm-iso $target_image=("localhost/" + image_name) $tag=default_tag: && (_run-vm target_image tag "iso" "disk_config/iso.toml")
+run-vm-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_run-vm target_image tag "iso" ("disk_config/iso-" + variant + ".toml") variant)
 
 # Run a virtual machine using systemd-vmspawn
 [group('Run Virtal Machine')]
-spawn-vm rebuild="0" type="qcow2" ram="6G":
+spawn-vm rebuild="0" type="qcow2" ram="6G" $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop:
     #!/usr/bin/env bash
-
     set -euo pipefail
-
-    [ "{{ rebuild }}" -eq 1 ] && echo "Rebuilding the ISO" && just build-vm {{ rebuild }} {{ type }}
-
+    case "{{ type }}" in
+        qcow2|raw) ;;
+        *) echo "spawn-vm supports qcow2 or raw." >&2; exit 1 ;;
+    esac
+    if [[ "{{ rebuild }}" == 1 ]]; then
+        just "rebuild-{{ type }}" "$target_image" "$tag" "$variant"
+    fi
+    image_file="output/$variant/${target_image//\//_}/$tag/{{ type }}/disk.{{ type }}"
+    [[ -f "$image_file" ]] || just "build-{{ type }}" "$target_image" "$tag" "$variant"
     systemd-vmspawn \
-      -M "bootc-image" \
-      --console=gui \
-      --cpus=2 \
-      --ram=$(echo {{ ram }}| /usr/bin/numfmt --from=iec) \
-      --network-user-mode \
-      --vsock=false --pass-ssh-key=false \
-      -i ./output/**/*.{{ type }}
-
+        -M "bootc-image-$variant" \
+        --console=gui --cpus=2 \
+        --ram="$(numfmt --from=iec '{{ ram }}')" \
+        --network-user-mode --vsock=false --pass-ssh-key=false \
+        -i "$image_file"
 
 # Runs shell check on all Bash scripts
 lint:
@@ -304,7 +254,7 @@ lint:
         exit 1
     fi
     # Run shellcheck on all Bash scripts
-    /usr/bin/find . -iname "*.sh" -type f -exec shellcheck "{}" ';'
+    /usr/bin/find . \( -iname "*.sh" -o -path "./system_files/usr/libexec/*" \) -type f -exec shellcheck "{}" +
 
 # Runs shfmt on all Bash scripts
 format:
