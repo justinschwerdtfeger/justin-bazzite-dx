@@ -43,11 +43,11 @@ Each image build uses the installed Niri package's defaults with Dux Shell
 integration. Navigation shortcuts and application window rules follow upstream.
 **Super+Space** opens the launcher, **Super+Return** opens Foot,
 **Super+Ctrl+Comma** opens settings, **Super+Ctrl+V** opens the clipboard,
-**Super+E** opens Nautilus, and **Super+Alt+L** locks the screen.
+**Super+E** opens Nautilus on GNOME or Dolphin on KDE, and **Super+Alt+L** locks
+the screen. 
 
-Nautilus, GNOME Keyring, and the GTK/GNOME portals are shared intentionally for
-niri's file manager, secrets, and screen sharing. KDE also retains Dolphin and
-its native portal. Desktop-specific package additions and removals belong in
+GNOME Keyring and the GTK/GNOME portals are shared for Niri's secrets and screen
+sharing. Desktop-specific package additions and removals belong in
 [`build_files/packages/gnome.sh`](build_files/packages/gnome.sh) or
 [`build_files/packages/kde.sh`](build_files/packages/kde.sh). Most packages remain
 in [`build_files/build.sh`](build_files/build.sh). Both variants use the same

@@ -38,6 +38,17 @@ install -Dm644 "${download_dir}/metadata.json" "${DESTDIR:-/}/usr/share/dux-shel
 if [[ -z "${DESTDIR:-}" ]]; then
   niri_defaults=/usr/share/doc/niri/default-config.kdl
   config_dir=/usr/share/dux-shell/niri
+
+  if [[ "${DESKTOP:-gnome}" == kde ]]; then
+    # Keep Niri's other portal backends, including GNOME screen sharing.
+    portal_defaults=/usr/share/xdg-desktop-portal/niri-portals.conf
+    grep -qx '\[preferred\]' "$portal_defaults"
+    install -d /etc/xdg/xdg-desktop-portal
+    sed '/^org\.freedesktop\.impl\.portal\.FileChooser=/d; /^\[preferred\]$/a org.freedesktop.impl.portal.FileChooser=kde;' \
+      "$portal_defaults" > /etc/xdg/xdg-desktop-portal/niri-portals.conf
+    sed -i 's/spawn "nautilus";/spawn "dolphin";/' "$config_dir/dms/binds.kdl"
+  fi
+
   if ! grep -qx 'input {' "$niri_defaults" ||
     ! grep -qx 'spawn-at-startup "waybar"' "$niri_defaults"; then
     echo "Niri defaults changed; review the Dux Shell integration." >&2

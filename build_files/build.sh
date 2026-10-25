@@ -57,15 +57,12 @@ dnf5 -y install \
   qt5ct qt6ct \
   brightnessctl \
   foot wl-clipboard \
-  xdg-desktop-portal-gtk xdg-desktop-portal-gnome gnome-keyring nautilus \
+  xdg-desktop-portal-gtk xdg-desktop-portal-gnome gnome-keyring \
   wget file
-# Keep GNOME's portal, keyring and Nautilus on both desktops: Niri uses them,
-# including the shared Mod+E binding. Native desktop additions live separately.
+# Niri shares the screen-sharing portal and keyring on both desktops.
+# File managers and the file chooser backend follow the desktop variant.
 if (( ${#DESKTOP_PACKAGES[@]} )); then
   dnf5 -y install "${DESKTOP_PACKAGES[@]}"
-fi
-if (( ${#DESKTOP_REMOVE_PACKAGES[@]} )); then
-  dnf5 -y remove "${DESKTOP_REMOVE_PACKAGES[@]}"
 fi
 dnf5 -y group install "c-development"
 
@@ -122,3 +119,7 @@ dnf5 -y copr disable dejan/lazygit
 #### Example for enabling a System Unit File
 
 systemctl enable podman.socket
+
+if (( ${#DESKTOP_REMOVE_PACKAGES[@]} )); then
+  dnf5 -y remove "${DESKTOP_REMOVE_PACKAGES[@]}"
+fi
