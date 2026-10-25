@@ -173,13 +173,29 @@ build. The final shell install and `bootc container lint` share a layer. Each
 published image digest is signed once for all its tags.
 
 [`build-disk.yml`](.github/workflows/build-disk.yml) builds QCOW2 and Anaconda ISO
-artifacts for both published desktops on amd64. GNOME disk builds can also
-consume the unsuffixed compatibility alias. Artifact names and S3 prefixes
+artifacts for both published desktops on amd64, using the explicit `-gnome` and
+`-kde` image names. Artifact names and S3 prefixes
 include the desktop image name, tag, architecture, and disk type. Disk pull-request
 checks use the **already published** `latest` containers, not the pull request's
 container changes. Publish both containers before building disks for a new repo.
 Same-repository jobs authenticate rootful Podman to read GHCR images. Every disk
 artifact includes a checked SHA-256 `-CHECKSUM` file alongside the image.
+
+Choose `anaconda-iso` in the workflow's **disk-type** input to build just the two
+installers. Optional **gnome-digest** and **kde-digest** inputs accept verified
+`sha256:...` container digests; without them the workflow uses `latest`.
+Each artifact records its source reference in `source-image.txt`.
+ISO checks verify BIOS/UEFI boot catalog entries and the embedded desktop update
+target, then boot the ISO's own kernel and initrd under QEMU with the ISO attached.
+The installer must reach its text installation summary. These checks cover
+installer startup, not firmware/GRUB execution or a completed installation.
+Boot logs and results are saved as separate `iso-boot-verification` artifacts,
+including for failed pull-request checks.
+
+To download an installer, open a successful **Build disk images** workflow run
+and select the desktop's `anaconda-iso` artifact. Extract it, run
+`sha256sum --check install.iso-CHECKSUM` in its `bootiso` directory, then use
+`bootiso/install.iso`. Leave **Upload to S3** disabled for GitHub downloads.
 
 To enable publishing in a fork, generate a Cosign key pair, keep `cosign.pub` in
 the repository, and store the unencrypted private key as the `SIGNING_SECRET`
