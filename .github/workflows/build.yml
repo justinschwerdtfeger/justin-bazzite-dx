@@ -155,8 +155,9 @@ jobs:
           BUILD_ARGS=(--layers --pull=always --format=docker)
           BUILD_ARGS+=(--build-arg "PACKAGE_REFRESH=$PACKAGE_REFRESH")
           BUILD_ARGS+=(--build-arg "DUX_SHELL_REFRESH=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}")
-          # Include mounted script contents explicitly in the cache key.
-          BUILD_ARGS+=(--build-arg "BUILD_SCRIPTS_SHA=$(find build_files -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d ' ' -f 1)")
+          # Invalidate only the layer that uses each mounted script.
+          BUILD_ARGS+=(--build-arg "PACKAGE_SCRIPT_SHA=$(sha256sum build_files/build.sh | cut -d ' ' -f 1)")
+          BUILD_ARGS+=(--build-arg "INITRAMFS_SCRIPT_SHA=$(sha256sum build_files/build-initramfs.sh | cut -d ' ' -f 1)")
           CACHE_IMAGE="$IMAGE_REGISTRY/$IMAGE_NAME-build-cache"
           if [[ "$FRESH_BUILD" == true ]]; then
             BUILD_ARGS+=(--no-cache)

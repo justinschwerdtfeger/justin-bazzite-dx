@@ -89,18 +89,22 @@ sudoif command *args:
 build $target_image=image_name $tag=default_tag:
     #!/usr/bin/env bash
 
+    set -euo pipefail
+
     BUILD_ARGS=()
     if [[ -z "$(git status -s)" ]]; then
         BUILD_ARGS+=("--build-arg" "SHA_HEAD_SHORT=$(git rev-parse --short HEAD)")
     fi
-    BUILD_SCRIPTS_SHA=$(find build_files -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d ' ' -f 1)
+    PACKAGE_SCRIPT_SHA=$(sha256sum build_files/build.sh | cut -d ' ' -f 1)
+    INITRAMFS_SCRIPT_SHA=$(sha256sum build_files/build-initramfs.sh | cut -d ' ' -f 1)
 
     podman build \
         "${BUILD_ARGS[@]}" \
         --pull=newer \
         --build-arg "PACKAGE_REFRESH=$(date -u +%Y%m%d)" \
         --build-arg "DUX_SHELL_REFRESH=$(date -u +%s%N)" \
-        --build-arg "BUILD_SCRIPTS_SHA=$BUILD_SCRIPTS_SHA" \
+        --build-arg "PACKAGE_SCRIPT_SHA=$PACKAGE_SCRIPT_SHA" \
+        --build-arg "INITRAMFS_SCRIPT_SHA=$INITRAMFS_SCRIPT_SHA" \
         --tag "${target_image}:${tag}" \
         .
 
