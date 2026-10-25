@@ -1,336 +1,196 @@
-# image-template
+# Justin's Bazzite DX + niri
 
-## Switch this machine back to the GitHub build
+Two x86_64 desktop variants share the same packages, artwork, niri integration,
+and prebuilt Dux Shell:
 
-After using a local development build, switch back to the image published by
-this repository:
+- **GNOME + niri** (default): `ghcr.io/justinschwerdtfeger/justin-bazzite-dx:latest`,
+  based on `ghcr.io/ublue-os/bazzite-dx-gnome:stable-44`.
+- **KDE Plasma + niri**: `ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest`,
+  based on `ghcr.io/ublue-os/bazzite-dx:stable-44`.
+
+The [upstream Bazzite DX project](https://github.com/ublue-os/bazzite-dx)
+uses the unsuffixed image name for KDE. This repository keeps its existing
+unsuffixed **GNOME** image name for compatibility. Only x86_64/amd64 is supported;
+the Dux prebuilt release and Google Chrome repository require it.
+
+## Switch back to the published image
+
+After testing a local development image, use the registry image matching your
+installed desktop:
 
 ```bash
+# GNOME
 sudo bootc switch --transport registry ghcr.io/justinschwerdtfeger/justin-bazzite-dx:latest
+# KDE
+sudo bootc switch --transport registry ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest
 ```
 
-Reboot when ready, then check `sudo bootc status` to confirm the booted image.
-Future updates follow the registry image again; `sudo bootc upgrade` stages an
-update manually.
+Reboot when ready, then check `sudo bootc status`. Future updates follow that
+registry image; `sudo bootc upgrade` stages an update manually. Upstream advises
+using the variant matching your installed desktop rather than rebasing between
+GNOME and KDE; use the corresponding installer for a new desktop installation.
 
 ## Niri with Dux Shell
 
-Select **Niri** at the login screen after installing this image or rebasing to it
-and rebooting. First login initializes `~/.config/niri` (or
-`$XDG_CONFIG_HOME/niri`) with Dux Shell defaults. Existing Niri paths and
-`NIRI_CONFIG` overrides are preserved; image updates leave user settings alone.
-To switch an existing setup, run `dms setup`, which backs up its configuration.
+Select **Niri** at the login screen after installing either variant or rebasing
+and rebooting. The native desktop session is also available. First login
+initializes `~/.config/niri` (or `$XDG_CONFIG_HOME/niri`) with Dux Shell defaults.
+Existing Niri paths and `NIRI_CONFIG` overrides are preserved; image updates
+leave user settings alone. To switch an existing setup, run `dms setup`, which
+backs up its configuration.
 
 Each image build uses the installed Niri package's defaults with Dux Shell
 integration. Navigation shortcuts and application window rules follow upstream.
-
-Shortcuts: **Super+Space** opens the launcher, **Super+Return** opens Foot,
+**Super+Space** opens the launcher, **Super+Return** opens Foot,
 **Super+Ctrl+Comma** opens settings, **Super+Ctrl+V** opens the clipboard,
-and **Super+Alt+L** locks the screen.
+**Super+E** opens Nautilus, and **Super+Alt+L** locks the screen.
+
+Nautilus, GNOME Keyring, and the GTK/GNOME portals are shared intentionally for
+niri's file manager, secrets, and screen sharing. KDE also retains Dolphin and
+its native portal. Desktop-specific package additions and removals belong in
+[`build_files/packages/gnome.sh`](build_files/packages/gnome.sh) or
+[`build_files/packages/kde.sh`](build_files/packages/kde.sh). Most packages remain
+in [`build_files/build.sh`](build_files/build.sh). Both variants use the same
+[`system_files`](system_files) and Dux Shell installer.
+
+## Build locally
+
+Required: `just`, Podman, standard GNU shell utilities, and Python 3.11+ for ISO
+configuration generation. Disk builds additionally require privileged rootful
+Podman and sudo access (or a root shell). Container builds can use rootless
+Podman. The recipes do not install host tools. Run `just lint` with ShellCheck
+installed, and `just check` to check Justfile formatting.
+
+```bash
+# Default GNOME image: localhost/justin-bazzite-dx:latest
+just build
+# KDE image: localhost/justin-bazzite-dx-kde:latest
+DESKTOP=kde just build
+
+# Existing image/tag positional arguments still work; desktop is optional third.
+just build localhost/my-gnome dev
+just build localhost/my-kde dev kde
+```
+
+Set `DESKTOP=gnome|kde` to choose default names for all recipes. `IMAGE_NAME`
+overrides the default local image name; `DEFAULT_TAG` defaults to `latest`.
+An explicit third desktop argument selects the base but leaves your explicit
+image name unchanged. Use `just build` so package and initramfs content hashes
+are supplied for the bind-mounted build scripts.
+
+### Disk images and VMs
+
+```bash
+# Convert the existing local container image.
+just build-iso
+DESKTOP=kde just build-iso
+DESKTOP=kde just build-qcow2
+
+# Build the container first, then convert it.
+DESKTOP=kde just rebuild-iso
+just rebuild-qcow2 localhost/my-gnome dev gnome
+
+# qcow2, raw, and iso commands accept the same image/tag/desktop arguments.
+DESKTOP=kde just run-vm-qcow2
+DESKTOP=kde just run-vm-iso
+```
+
+`build-vm`, `rebuild-vm`, and `run-vm` remain aliases for their QCOW2 recipes.
+Artifacts are separated by desktop, image name (slashes replaced with `_`), and
+tag. For example:
+
+```text
+output/gnome/localhost_justin-bazzite-dx/latest/bootiso/install.iso
+output/kde/localhost_justin-bazzite-dx-kde/latest/qcow2/disk.qcow2
+```
+
+`spawn-vm` uses systemd-vmspawn and preserves its first three arguments:
+`just spawn-vm 0 qcow2 6G [image] [tag] [desktop]`. The other VM recipes use
+QEMU in Podman and require `/dev/kvm`.
+
+Both local disk builds and disk CI use the official builder digest in
+[`disk_config/builder-image`](disk_config/builder-image), with the explicit
+`build IMAGE --type TYPE --config /config.toml --output /output` CLI. Local builds
+can override it with `BIB_IMAGE`, using a version compatible with that CLI.
+`just build-iso` requests **anaconda-iso**; `iso` remains the friendly recipe name.
+The local rootless image is streamed into rootful Podman when needed, without
+requiring localhost SSH or Podman scp configuration. A host without working
+privileged Podman/sudo can build containers, but cannot run these disk recipes.
+
+Restricted LXC containers may deny the builder's required `devtmpfs` mount even
+with `--privileged`. This development LXC does so; both container variants build,
+but local ISO generation needs a VM/native host or LXC configuration that permits
+that mount. Installing another host package does not resolve this restriction.
+
+### Installer update target
+
+[`disk_config/iso.toml`](disk_config/iso.toml) is a shared template. Both local
+recipes and CI render its `@IMAGE_REF@` placeholder using
+[`build_files/render-iso-config.py`](build_files/render-iso-config.py), so the
+installed system follows the intended registry image. The former desktop ISO
+files containing fixed registry names have been replaced by this one template.
+The installer enables the normal storage, networking, users, and desktop setup
+modules for both variants.
+
+For local builds, `localhost/name:tag` (or an unqualified name) defaults to
+`IMAGE_REGISTRY/name:tag`, where `IMAGE_REGISTRY` defaults to
+`ghcr.io/justinschwerdtfeger`. A fully qualified registry image keeps its reference.
+Set `INSTALL_IMAGE` to override the installed system's update source independently
+of the local build tag, including when that local tag is unpublished:
+
+```bash
+INSTALL_IMAGE=ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest \
+  just build-iso localhost/my-kde dev kde
+```
+
+Use a registry image that exists and matches the desktop being installed.
+CI derives the target directly from its selected published image and tag.
+
+## CI and build caching
+
+[`build.yml`](.github/workflows/build.yml) builds both desktop variants on amd64.
+GNOME preserves the existing registry package; KDE publishes to `<repo>-kde`.
+Metadata links still point to the source repository. Each image has a separate
+`<image>-build-cache` GHCR package; existing GNOME cache names are preserved.
+The cache packages must grant this repository's Actions token read/write access.
+
+Only default-branch publishing builds write caches. Same-repository pull requests
+can read them; fork pull requests build without reading them. The workflow
+checks for newer base images. A daily key refreshes package installation, and a
+combined hash of `build_files/build.sh` and **all** desktop package files
+invalidates that layer when package settings change. Local Just builds calculate
+the same hash. Changes to the shell installer or initramfs script use separate
+contexts so they can reuse package installation. Artwork is copied before
+dracut runs. Choose **fresh-build** in the container workflow to ignore caches.
+
+Package installs are grouped by repository availability. Each Copr is enabled
+only for its own packages, and Terra is disabled for the remaining development
+tools. The prebuilt Dux Shell is refreshed after initramfs generation on every
+build. The final shell install and `bootc container lint` share a layer. Each
+published image digest is signed once for all its tags.
+
+[`build-disk.yml`](.github/workflows/build-disk.yml) builds QCOW2 and Anaconda ISO
+artifacts for both published desktops on amd64. Artifact names and S3 prefixes
+include the desktop image name, tag, architecture, and disk type. Disk pull-request
+checks use the **already published** `latest` containers, not the pull request's
+container changes. Publish both containers before building disks for a new repo.
+
+To enable publishing in a fork, generate a Cosign key pair, keep `cosign.pub` in
+the repository, and store the unencrypted private key as the `SIGNING_SECRET`
+Actions secret. Never commit `cosign.key`. Workflow image names default to your
+repository name; adjust local `IMAGE_NAME`/`IMAGE_REGISTRY` for your fork.
+
+Optional S3 uploads use `S3_PROVIDER`, `S3_BUCKET_NAME`, `S3_ACCESS_KEY_ID`,
+`S3_SECRET_ACCESS_KEY`, `S3_REGION`, and `S3_ENDPOINT` Actions secrets. Without
+S3, disk images are available as Actions artifacts.
 
 ## DMS application theming
 
-The image includes `qt5ct`, `qt6ct`, and both Qt5 and Qt6 plugins for
-[`qtengine`](https://github.com/kossLAN/qtengine). The qtengine RPM comes from
-the [desertedman/qtengine Copr](https://copr.fedorainfracloud.org/coprs/desertedman/qtengine/),
-which is enabled only for its installation.
-
+Both images include `qt5ct`, `qt6ct`, and the Qt5/Qt6 plugins for
+[qtengine](https://github.com/kossLAN/qtengine), installed from the
+[desertedman/qtengine Copr](https://copr.fedorainfracloud.org/coprs/desertedman/qtengine/).
 To use qtengine in your DMS session, set `QT_QPA_PLATFORMTHEME=qtengine` in
 `~/.config/environment.d/90-dms.conf`, then log out and back in. Enable **Apply Qt
 Themes** in DMS's **Theme & Colors** settings. You can instead select `qt5ct` or
 `qt6ct` in your session configuration. See the
-[DMS application theming guide](https://duxlabs.dev/docs/dankmaterialshell/application-themes/)
-for compositor configuration and other options.
-
-## Build performance
-
-The container workflow uses rootful Buildah with native overlay storage. This
-avoids the build action's automatic `fuse-overlayfs` override, which was used in
-the September 3, 2026 build that spent about 9.5 minutes linting and 25.5 minutes
-committing the image. The October 13 build already completed in about 8 minutes,
-so future timings should be compared against that more recent baseline.
-
-Build layers are saved in the separate GHCR package
-`ghcr.io/justinschwerdtfeger/justin-bazzite-dx-build-cache`. Only builds publishing
-from the default branch write this cache; pull requests cannot overwrite it, and
-fork pull requests build without reading it. The main OS image and its tags stay
-at the existing registry location. The cache package must grant this repository's
-Actions token read/write access if a package with that name already exists.
-
-The workflow always checks for a newer base image. A daily cache key forces
-package installations to run again each UTC day, so scheduled builds still pick
-up package updates. Only `build_files/build.sh` changes invalidate the package
-script's cache key. The scripts have separate build contexts so edits to the shell
-installer or initramfs script can reuse installed packages. Artwork and initramfs
-script changes rerun initramfs generation without reinstalling packages. Choose
-**fresh-build** when running the workflow manually to ignore all cached layers.
-The first build populates the cache and may take longer; subsequent builds on the
-same day can reuse it when the base and inputs match.
-
-Package installs are grouped by repository availability to reduce repeated DNF
-transactions. Each Copr remains enabled only for its own packages, and Terra is
-disabled for the remaining development tools. The prebuilt Dux Shell is refreshed
-on every build, after initramfs generation so the initramfs layer can be reused
-when the base, packages, and artwork match. The final shell install and
-`bootc container lint` share a layer, avoiding a separate filesystem scan/commit
-for linting. The published digest is signed once for all its tags. Changes outside
-the image inputs no longer trigger container builds.
-
-This repository is meant to be a template for building your own custom [bootc](https://github.com/bootc-dev/bootc) image. This template is the recommended way to make customizations to any image published by the Universal Blue Project.
-
-# Community
-
-If you have questions about this template after following the instructions, try the following spaces:
-- [Universal Blue Forums](https://universal-blue.discourse.group/)
-- [Universal Blue Discord](https://discord.gg/WEu6BdFEtp)
-- [bootc discussion forums](https://github.com/bootc-dev/bootc/discussions) - This is not an Universal Blue managed space, but is an excellent resource if you run into issues with building bootc images.
-
-# How to Use
-
-To get started on your first bootc image, simply read and follow the steps in the next few headings.
-If you prefer instructions in video form, TesterTech created an excellent tutorial, embedded below.
-
-[![Video Tutorial](https://img.youtube.com/vi/IxBl11Zmq5w/0.jpg)](https://www.youtube.com/watch?v=IxBl11Zmq5wE)
-
-## Step 0: Prerequisites
-
-These steps assume you have the following:
-- A Github Account
-- A machine running a bootc image (e.g. Bazzite, Bluefin, Aurora, or Fedora Atomic)
-- Experience installing and using CLI programs
-
-## Step 1: Preparing the Template
-
-### Step 1a: Copying the Template
-
-Select `Use this Template` on this page. You can set the name and description of your repository to whatever you would like, but all other settings should be left untouched.
-
-Once you have finished copying the template, you need to enable the Github Actions workflows for your new repository.
-To enable the workflows, go to the `Actions` tab of the new repository and click the button to enable workflows.
-
-### Step 1b: Cloning the New Repository
-
-Here I will defer to the much superior GitHub documentation on the matter. You can use whichever method is easiest.
-[GitHub Documentation](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository)
-
-Once you have the repository on your local drive, proceed to the next step.
-
-## Step 2: Initial Setup
-
-### Step 2a: Creating a Cosign Key
-
-Container signing is important for end-user security and is enabled on all Universal Blue images. By default the image builds *will fail* if you don't.
-
-First, install the [cosign CLI tool](https://edu.chainguard.dev/open-source/sigstore/cosign/how-to-install-cosign/#installing-cosign-with-the-cosign-binary)
-With the cosign tool installed, run inside your repo folder:
-
-```bash
-COSIGN_PASSWORD="" cosign generate-key-pair
-```
-
-The signing key will be used in GitHub Actions and will not work if it is password protected.
-
-> [!WARNING]
-> Be careful to *never* accidentally commit `cosign.key` into your git repo. If this key goes out to the public, the security of your repository is compromised.
-
-Next, you need to add the key to GitHub. This makes use of GitHub's secret signing system.
-
-<details>
-    <summary>Using the Github Web Interface (preferred)</summary>
-
-Go to your repository settings, under `Secrets and Variables` -> `Actions`
-![image](https://user-images.githubusercontent.com/1264109/216735595-0ecf1b66-b9ee-439e-87d7-c8cc43c2110a.png)
-Add a new secret and name it `SIGNING_SECRET`, then paste the contents of `cosign.key` into the secret and save it. Make sure it's the .key file and not the .pub file. Once done, it should look like this:
-![image](https://user-images.githubusercontent.com/1264109/216735690-2d19271f-cee2-45ac-a039-23e6a4c16b34.png)
-</details>
-<details>
-<summary>Using the Github CLI</summary>
-
-If you have the `github-cli` installed, run:
-
-```bash
-gh secret set SIGNING_SECRET < cosign.key
-```
-</details>
-
-### Step 2b: Choosing Your Base Image
-
-To choose a base image, simply modify the line in the container file starting with `FROM`. This will be the image your image derives from, and is your starting point for modifications.
-For a base image, you can choose any of the Universal Blue images or start from a Fedora Atomic system. Below this paragraph is a dropdown with a non-exhaustive list of potential base images.
-
-<details>
-    <summary>Base Images</summary>
-
-- Bazzite: `ghcr.io/ublue-os/bazzite:stable`
-- Aurora: `ghcr.io/ublue-os/aurora:stable`
-- Bluefin: `ghcr.io/ublue-os/bluefin:stable`
-- Universal Blue Base: `ghcr.io/ublue-os/base-main:latest`
-- Fedora: `quay.io/fedora/fedora-bootc:42`
-
-You can find more Universal Blue images on the [packages page](https://github.com/orgs/ublue-os/packages).
-</details>
-
-If you don't know which image to pick, choosing the one your system is currently on is the best bet for a smooth transition. To find out what image your system currently uses, run the following command:
-```bash
-sudo bootc status
-```
-This will show you all the info you need to know about your current image. The image you are currently on is displayed after `Booted image:`. Paste that information after the `FROM` statement in the Containerfile to set it as your base image.
-
-### Step 2c: Changing Names
-
-Change the first line in the [Justfile](./Justfile) to your image's name.
-
-To commit and push all the files changed and added in step 2 into your Github repository:
-```bash
-git add Containerfile Justfile cosign.pub
-git commit -m "Initial Setup"
-git push
-```
-Once pushed, go look at the Actions tab on your Github repository's page.  The green checkmark should be showing on the top commit, which means your new image is ready!
-
-## Step 3: Switch to Your Image
-
-From your bootc system, run the following command substituting in your Github username and image name where noted.
-```bash
-sudo bootc switch ghcr.io/<username>/<image_name>
-```
-This should queue your image for the next reboot, which you can do immediately after the command finishes. You have officially set up your custom image! See the following section for an explanation of the important parts of the template for customization.
-
-# Repository Contents
-
-## Containerfile
-
-The [Containerfile](./Containerfile) defines the operations used to customize the selected image.This file is the entrypoint for your image build, and works exactly like a regular podman Containerfile. For reference, please see the [Podman Documentation](https://docs.podman.io/en/latest/Introduction.html).
-
-## build.sh
-
-The [build.sh](./build_files/build.sh) file is called from your Containerfile. It is the best place to install new packages or make any other customization to your system. There are customization examples contained within it for your perusal.
-
-## build.yml
-
-The [build.yml](./.github/workflows/build.yml) Github Actions workflow creates your custom OCI image and publishes it to the Github Container Registry (GHCR). By default, the image name will match the Github repository name. There are several environment variables at the start of the workflow which may be of interest to change.
-
-# Building Disk Images
-
-This template provides an out of the box workflow for creating disk images (ISO, qcow, raw) for your custom OCI image which can be used to directly install onto your machines.
-
-This template provides a way to upload the disk images that is generated from the workflow to a S3 bucket. The disk images will also be available as an artifact from the job, if you wish to use an alternate provider. To upload to S3 we use [rclone](https://rclone.org/) which is able to use [many S3 providers](https://rclone.org/s3/).
-
-## Setting Up ISO Builds
-
-The [build-disk.yml](./.github/workflows/build-disk.yml) Github Actions workflow creates a disk image from your OCI image by utilizing the [bootc-image-builder](https://osbuild.org/docs/bootc/). In order to use this workflow you must complete the following steps:
-
-1. Modify `disk_config/iso.toml` to point to your custom container image before generating an ISO image.
-2. If you changed your image name from the default in `build.yml` then in the `build-disk.yml` file edit the `IMAGE_REGISTRY`, `IMAGE_NAME` and `DEFAULT_TAG` environment variables with the correct values. If you did not make changes, skip this step.
-3. Finally, if you want to upload your disk images to S3 then you will need to add your S3 configuration to the repository's Action secrets. This can be found by going to your repository settings, under `Secrets and Variables` -> `Actions`. You will need to add the following
-  - `S3_PROVIDER` - Must match one of the values from the [supported list](https://rclone.org/s3/)
-  - `S3_BUCKET_NAME` - Your unique bucket name
-  - `S3_ACCESS_KEY_ID` - It is recommended that you make a separate key just for this workflow
-  - `S3_SECRET_ACCESS_KEY` - See above.
-  - `S3_REGION` - The region your bucket lives in. If you do not know then set this value to `auto`.
-  - `S3_ENDPOINT` - This value will be specific to the bucket as well.
-
-Once the workflow is done, you'll find the disk images either in your S3 bucket or as part of the summary under `Artifacts` after the workflow is completed.
-
-# Artifacthub
-
-This template comes with the necessary tooling to index your image on [artifacthub.io](https://artifacthub.io). Use the `artifacthub-repo.yml` file at the root to verify yourself as the publisher. This is important to you for a few reasons:
-
-- The value of artifacthub is it's one place for people to index their custom images, and since we depend on each other to learn, it helps grow the community. 
-- You get to see your pet project listed with the other cool projects in Cloud Native.
-- Since the site puts your README front and center, it's a good way to learn how to write a good README, learn some marketing, finding your audience, etc. 
-
-[Discussion Thread](https://universal-blue.discourse.group/t/listing-your-custom-image-on-artifacthub/6446)
-
-# Justfile Documentation
-
-The `Justfile` contains various commands and configurations for building and managing container images and virtual machine images using Podman and other utilities.
-To use it, you must have installed [just](https://just.systems/man/en/introduction.html) from your package manager or manually. It is available by default on all Universal Blue images.
-
-## Environment Variables
-
-- `image_name`: The name of the image (default: "image-template").
-- `default_tag`: The default tag for the image (default: "latest").
-- `bib_image`: The Bootc Image Builder (BIB) image (default: "quay.io/centos-bootc/bootc-image-builder:latest").
-
-## Building The Image
-
-### `just build`
-
-Builds a container image using Podman.
-
-```bash
-just build $target_image $tag
-```
-
-Arguments:
-- `$target_image`: The tag you want to apply to the image (default: `$image_name`).
-- `$tag`: The tag for the image (default: `$default_tag`).
-
-## Building and Running Virtual Machines and ISOs
-
-The below commands all build QCOW2 images. To produce or use a different type of image, substitute in the command with that type in the place of `qcow2`. The available types are `qcow2`, `iso`, and `raw`.
-
-### `just build-qcow2`
-
-Builds a QCOW2 virtual machine image.
-
-```bash
-just build-qcow2 $target_image $tag
-```
-
-### `just rebuild-qcow2`
-
-Rebuilds a QCOW2 virtual machine image.
-
-```bash
-just rebuild-vm $target_image $tag
-```
-
-### `just run-vm-qcow2`
-
-Runs a virtual machine from a QCOW2 image.
-
-```bash
-just run-vm-qcow2 $target_image $tag
-```
-
-### `just spawn-vm`
-
-Runs a virtual machine using systemd-vmspawn.
-
-```bash
-just spawn-vm rebuild="0" type="qcow2" ram="6G"
-```
-
-## File Management
-
-### `just check`
-
-Checks the syntax of all `.just` files and the `Justfile`.
-
-### `just fix`
-
-Fixes the syntax of all `.just` files and the `Justfile`.
-
-### `just clean`
-
-Cleans the repository by removing build artifacts.
-
-### `just lint`
-
-Runs shell check on all Bash scripts.
-
-### `just format`
-
-Runs shfmt on all Bash scripts.
-
-## Community Examples
-
-These are images derived from this template (or similar enough to this template). Reference them when building your image!
-
-- [m2Giles' OS](https://github.com/m2giles/m2os)
-- [bOS](https://github.com/bsherman/bos)
-- [Homer](https://github.com/bketelsen/homer/)
-- [Amy OS](https://github.com/astrovm/amyos)
-- [VeneOS](https://github.com/Venefilyn/veneos)
+[DMS application theming guide](https://duxlabs.dev/docs/dankmaterialshell/application-themes/).

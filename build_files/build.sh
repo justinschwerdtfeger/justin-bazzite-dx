@@ -2,6 +2,19 @@
 
 set -ouex pipefail
 
+if [[ "$(uname -m)" != x86_64 ]]; then
+  echo "The Dux Shell prebuilt release only supports Linux x86_64." >&2
+  exit 1
+fi
+
+case "${DESKTOP:-gnome}" in
+  gnome|kde) ;;
+  *) echo "Unsupported desktop: $DESKTOP (expected gnome or kde)" >&2; exit 1 ;;
+esac
+script_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+# shellcheck source=build_files/packages/gnome.sh
+source "$script_dir/packages/${DESKTOP:-gnome}.sh"
+
 ### Install packages
 
 # Install browsers and monitoring tools in one transaction.
@@ -46,6 +59,14 @@ dnf5 -y install \
   foot wl-clipboard \
   xdg-desktop-portal-gtk xdg-desktop-portal-gnome gnome-keyring nautilus \
   wget file
+# Keep GNOME's portal, keyring and Nautilus on both desktops: Niri uses them,
+# including the shared Mod+E binding. Native desktop additions live separately.
+if (( ${#DESKTOP_PACKAGES[@]} )); then
+  dnf5 -y install "${DESKTOP_PACKAGES[@]}"
+fi
+if (( ${#DESKTOP_REMOVE_PACKAGES[@]} )); then
+  dnf5 -y remove "${DESKTOP_REMOVE_PACKAGES[@]}"
+fi
 dnf5 -y group install "c-development"
 
 # Install the packaged Qt5 and Qt6 theme plugins from Copr.
