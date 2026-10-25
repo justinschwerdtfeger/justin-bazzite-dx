@@ -37,14 +37,13 @@ dnf5 -y copr disable avengemedia/danklinux
 # Install development tools and desktop utilities with Terra and the added Coprs
 # disabled. One transaction avoids repeating dependency solving and RPM setup.
 dnf5 -y install \
-  gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl \
+  gcc gcc-c++ make ncurses xz perl \
   wlsunset \
   ripgrep fd-find tree-sitter-cli neovim python3-neovim \
   pipx python3-devel \
   qt5ct qt6ct \
   brightnessctl \
-  webkit2gtk4.1-devel openssl-devel curl wget file \
-  libappindicator-gtk3-devel librsvg2-devel libxdo-devel
+  wget file
 dnf5 -y group install "c-development"
 
 # Install the packaged Qt5 and Qt6 theme plugins from Copr.
