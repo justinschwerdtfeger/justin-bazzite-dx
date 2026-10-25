@@ -2,6 +2,19 @@
 
 set -ouex pipefail
 
+if [[ "$(uname -m)" != x86_64 ]]; then
+  echo "The Dux Shell prebuilt release only supports Linux x86_64." >&2
+  exit 1
+fi
+
+case "${DESKTOP:-gnome}" in
+  gnome|kde) ;;
+  *) echo "Unsupported desktop: $DESKTOP (expected gnome or kde)" >&2; exit 1 ;;
+esac
+script_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+# shellcheck source=build_files/packages/gnome.sh
+source "$script_dir/packages/${DESKTOP:-gnome}.sh"
+
 ### Install packages
 
 # Install browsers and monitoring tools in one transaction.
@@ -44,8 +57,13 @@ dnf5 -y install \
   qt5ct qt6ct \
   brightnessctl \
   foot wl-clipboard \
-  xdg-desktop-portal-gtk xdg-desktop-portal-gnome gnome-keyring nautilus \
+  xdg-desktop-portal-gtk xdg-desktop-portal-gnome gnome-keyring \
   wget file
+# Niri shares the screen-sharing portal and keyring on both desktops.
+# File managers and the file chooser backend follow the desktop variant.
+if (( ${#DESKTOP_PACKAGES[@]} )); then
+  dnf5 -y install "${DESKTOP_PACKAGES[@]}"
+fi
 dnf5 -y group install "c-development"
 
 # Install the packaged Qt5 and Qt6 theme plugins from Copr.
@@ -101,3 +119,7 @@ dnf5 -y copr disable dejan/lazygit
 #### Example for enabling a System Unit File
 
 systemctl enable podman.socket
+
+if (( ${#DESKTOP_REMOVE_PACKAGES[@]} )); then
+  dnf5 -y remove "${DESKTOP_REMOVE_PACKAGES[@]}"
+fi

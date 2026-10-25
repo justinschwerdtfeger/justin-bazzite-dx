@@ -1,20 +1,19 @@
 [customizations.installer.kickstart]
 contents = """
-%post
+%post --erroronfail
 bootc switch --mutate-in-place --transport registry ghcr.io/justinschwerdtfeger/justin-bazzite-dx:latest
 %end
 """
 
 [customizations.installer.modules]
+# Bazzite DX lacks gnome-initial-setup, so provision users in the installer.
 enable = [
   "org.fedoraproject.Anaconda.Modules.Storage",
-  "org.fedoraproject.Anaconda.Modules.Runtime"
-]
-disable = [
+  "org.fedoraproject.Anaconda.Modules.Runtime",
   "org.fedoraproject.Anaconda.Modules.Network",
   "org.fedoraproject.Anaconda.Modules.Security",
   "org.fedoraproject.Anaconda.Modules.Services",
   "org.fedoraproject.Anaconda.Modules.Users",
-  "org.fedoraproject.Anaconda.Modules.Subscription",
   "org.fedoraproject.Anaconda.Modules.Timezone"
 ]
+disable = ["org.fedoraproject.Anaconda.Modules.Subscription"]
