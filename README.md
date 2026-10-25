@@ -3,14 +3,17 @@
 Two x86_64 desktop variants share the same packages, artwork, niri integration,
 and prebuilt Dux Shell:
 
-- **GNOME + niri** (default): `ghcr.io/justinschwerdtfeger/justin-bazzite-dx:latest`,
+- **GNOME + niri** (default): `ghcr.io/justinschwerdtfeger/justin-bazzite-dx-gnome:latest`,
   based on `ghcr.io/ublue-os/bazzite-dx-gnome:stable-44`.
 - **KDE Plasma + niri**: `ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest`,
   based on `ghcr.io/ublue-os/bazzite-dx:stable-44`.
 
 The [upstream Bazzite DX project](https://github.com/ublue-os/bazzite-dx)
-uses the unsuffixed image name for KDE. This repository keeps its existing
-unsuffixed **GNOME** image name for compatibility. Only x86_64/amd64 is supported;
+uses the unsuffixed image name for KDE. This repository publishes the same
+**GNOME** image as both `justin-bazzite-dx-gnome` (primary) and
+`justin-bazzite-dx` (compatibility alias). Both names have identical digests and
+are signed; publishing the alias does not build another image.
+Only x86_64/amd64 is supported;
 the Dux prebuilt release and Google Chrome repository require it.
 
 ## Switch back to the published image
@@ -20,7 +23,7 @@ installed desktop:
 
 ```bash
 # GNOME
-sudo bootc switch --transport registry ghcr.io/justinschwerdtfeger/justin-bazzite-dx:latest
+sudo bootc switch --transport registry ghcr.io/justinschwerdtfeger/justin-bazzite-dx-gnome:latest
 # KDE
 sudo bootc switch --transport registry ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest
 ```
@@ -62,7 +65,7 @@ Run `just lint` with ShellCheck
 installed, and `just check` to check Justfile formatting.
 
 ```bash
-# Default GNOME image: localhost/justin-bazzite-dx:latest
+# Default GNOME image: localhost/justin-bazzite-dx-gnome:latest
 just build
 # KDE image: localhost/justin-bazzite-dx-kde:latest
 DESKTOP=kde just build
@@ -100,7 +103,7 @@ Artifacts are separated by desktop, image name (slashes replaced with `_`), and
 tag. For example:
 
 ```text
-output/gnome/localhost_justin-bazzite-dx/latest/bootiso/install.iso
+output/gnome/localhost_justin-bazzite-dx-gnome/latest/bootiso/install.iso
 output/kde/localhost_justin-bazzite-dx-kde/latest/qcow2/disk.qcow2
 ```
 
@@ -134,7 +137,7 @@ upstream GNOME config. Both local Just recipes and CI select the file for
 the requested desktop. No configuration renderer or Python dependency is needed.
 
 Their Kickstart `bootc switch` commands set the installed system's update source:
-GNOME follows `ghcr.io/justinschwerdtfeger/justin-bazzite-dx:latest`, and KDE follows
+GNOME follows `ghcr.io/justinschwerdtfeger/justin-bazzite-dx-gnome:latest`, and KDE follows
 `ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest`. These targets are fixed
 in the selected TOML file, independently of the image name/tag passed to the disk
 builder. A local development ISO therefore follows the corresponding published
@@ -145,9 +148,11 @@ or `DEFAULT_TAG` alone does not change the installer target.
 ## CI and build caching
 
 [`build.yml`](.github/workflows/build.yml) builds both desktop variants on amd64.
-GNOME preserves the existing registry package; KDE publishes to `<repo>-kde`.
-Metadata links still point to the source repository. Each image has a separate
-`<image>-build-cache` GHCR package; existing GNOME cache names are preserved.
+GNOME publishes to `<repo>-gnome` and `<repo>` from one build; KDE publishes to
+`<repo>-kde`. The push step checks that all tags and the GNOME alias have the
+same digest, then signs each published image name. Metadata links still point
+to the source repository. Each desktop has a separate cache package; GNOME keeps
+`<repo>-build-cache` and KDE keeps `<repo>-kde-build-cache`.
 The cache packages must grant this repository's Actions token read/write access.
 
 Only default-branch publishing builds write caches. Same-repository pull requests
@@ -168,10 +173,13 @@ build. The final shell install and `bootc container lint` share a layer. Each
 published image digest is signed once for all its tags.
 
 [`build-disk.yml`](.github/workflows/build-disk.yml) builds QCOW2 and Anaconda ISO
-artifacts for both published desktops on amd64. Artifact names and S3 prefixes
+artifacts for both published desktops on amd64. GNOME disk builds can also
+consume the unsuffixed compatibility alias. Artifact names and S3 prefixes
 include the desktop image name, tag, architecture, and disk type. Disk pull-request
 checks use the **already published** `latest` containers, not the pull request's
 container changes. Publish both containers before building disks for a new repo.
+Same-repository jobs authenticate rootful Podman to read GHCR images. Every disk
+artifact includes a checked SHA-256 `-CHECKSUM` file alongside the image.
 
 To enable publishing in a fork, generate a Cosign key pair, keep `cosign.pub` in
 the repository, and store the unencrypted private key as the `SIGNING_SECRET`
