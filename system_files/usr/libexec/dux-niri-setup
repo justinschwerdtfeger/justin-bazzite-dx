@@ -1,0 +1,19 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Preserve partial setups and dangling symlinks too.
+[[ -z "${NIRI_CONFIG:-}" ]] || exit 0
+config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
+[[ "$config_home" = /* ]] || config_home="$HOME/.config"
+niri_dir="$config_home/niri"
+[[ ! -e "$niri_dir" && ! -L "$niri_dir" ]] || exit 0
+
+defaults_dir="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../share/dux-shell/niri"
+mkdir -p -- "$config_home"
+staging_dir=$(mktemp -d "$config_home/.dux-niri.XXXXXXXX")
+trap 'rm -rf -- "$staging_dir"' EXIT
+cp -a -- "$defaults_dir/." "$staging_dir/"
+
+# Do not overwrite a config created during staging.
+mv --no-clobber --no-target-directory -- "$staging_dir" "$niri_dir"

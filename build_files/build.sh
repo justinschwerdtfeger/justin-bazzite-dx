@@ -43,6 +43,8 @@ dnf5 -y install \
   pipx python3-devel \
   qt5ct qt6ct \
   brightnessctl \
+  foot wl-clipboard \
+  xdg-desktop-portal-gtk xdg-desktop-portal-gnome gnome-keyring nautilus \
   wget file
 dnf5 -y group install "c-development"
 
@@ -68,7 +70,7 @@ dnf5 -y copr disable quadratech188/vicinae
 
 # Install Niri from Copr
 dnf5 -y copr enable yalter/niri
-dnf5 -y install niri
+dnf5 -y install niri xwayland-satellite
 dnf5 -y copr disable yalter/niri
 
 # Install Keyd from Copr

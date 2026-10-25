@@ -33,3 +33,22 @@ printf '%s  %s\n' "$sha256" "${download_dir}/${archive}" | sha256sum --check --s
 tar --extract --gzip --file "${download_dir}/${archive}" \
   --directory "${DESTDIR:-/}" --no-same-owner
 install -Dm644 "${download_dir}/metadata.json" "${DESTDIR:-/}/usr/share/dux-shell/metadata.json"
+
+# Staged installs may not have a runnable Niri.
+if [[ -z "${DESTDIR:-}" ]]; then
+  niri_defaults=/usr/share/doc/niri/default-config.kdl
+  config_dir=/usr/share/dux-shell/niri
+  if ! grep -qx 'input {' "$niri_defaults" ||
+    ! grep -qx 'spawn-at-startup "waybar"' "$niri_defaults"; then
+    echo "Niri defaults changed; review the Dux Shell integration." >&2
+    exit 1
+  fi
+
+  # Keep upstream defaults; DMS owns input settings and replaces Waybar.
+  sed '/^input {$/,/^}$/d; /^spawn-at-startup "waybar"$/d' \
+    "$niri_defaults" >"$config_dir/upstream.kdl"
+  sed -n '/^input {$/,/^}$/p' \
+    "$niri_defaults" >"$config_dir/dms/input.kdl"
+  [[ $(grep -c '^}$' "$config_dir/dms/input.kdl") == 1 ]]
+  niri validate --config "$config_dir/config.kdl"
+fi
