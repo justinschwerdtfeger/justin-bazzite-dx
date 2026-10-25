@@ -39,9 +39,10 @@ RUN rm /opt && mkdir /opt
 # CI changes this daily so cached package installs still receive repository updates.
 ARG PACKAGE_REFRESH=local
 ARG PACKAGE_SCRIPT_SHA=local
+# DNF deletes cached RPMs after installing them; concurrent builds must wait.
 RUN --mount=type=bind,from=packages_ctx,source=/,target=/ctx \
-    --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
+    --mount=type=cache,dst=/var/cache,sharing=locked \
+    --mount=type=cache,dst=/var/log,sharing=locked \
     --mount=type=tmpfs,dst=/tmp \
     test -n "$PACKAGE_REFRESH" && test -n "$PACKAGE_SCRIPT_SHA" && \
     /ctx/build.sh
@@ -52,8 +53,8 @@ COPY system_files /
 
 ARG INITRAMFS_SCRIPT_SHA=local
 RUN --mount=type=bind,from=initramfs_ctx,source=/,target=/ctx \
-    --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
+    --mount=type=cache,dst=/var/cache,sharing=locked \
+    --mount=type=cache,dst=/var/log,sharing=locked \
     --mount=type=tmpfs,dst=/tmp \
     test -n "$INITRAMFS_SCRIPT_SHA" && /ctx/build-initramfs.sh
 

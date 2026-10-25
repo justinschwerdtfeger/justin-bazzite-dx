@@ -19,13 +19,13 @@ on:
       - main
     paths:
       - 'disk_config/**'
-      - 'build_files/render-iso-config.py'
       - '.github/workflows/build-disk.yml'
 
 env:
   IMAGE_NAME: ${{ github.event.repository.name }} # output of build.yml, keep in sync
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
   DEFAULT_TAG: "latest"
+  BIB_IMAGE: "quay.io/centos-bootc/bootc-image-builder:latest"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
@@ -34,6 +34,7 @@ concurrency:
 jobs:
   build:
     name: ${{ matrix.desktop }} / ${{ matrix.disk-type }} (amd64)
+    # Dux Shell's prebuilt release and the Chrome repository require amd64.
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -48,9 +49,6 @@ jobs:
       id-token: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
       - name: Prepare environment
         run: |
           USER_UID=$(id -u)
@@ -60,7 +58,6 @@ jobs:
           DISK_TYPE=$(echo "${{ matrix.disk-type }}" | tr ' ' '-')
           # Lowercase the image uri
           {
-            echo "BIB_IMAGE=$(cat disk_config/builder-image)"
             echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}"
             echo "IMAGE_NAME=${IMAGE_NAME,,}"
             echo "DISK_TYPE=${DISK_TYPE}"
@@ -69,41 +66,24 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Maximize build space
-        uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
+        uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
         with:
           remove-codeql: true
 
-      - name: Render installer configuration
-        if: matrix.disk-type == 'anaconda-iso'
-        run: |
-          python3 build_files/render-iso-config.py \
-            "$IMAGE_REGISTRY/$IMAGE_NAME:$DEFAULT_TAG" \
-            "$RUNNER_TEMP/iso.toml"
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # Keep the invocation identical to Just's pinned BIB CLI, without a
-      # deprecated action translating flags for a different builder version.
       - name: Build disk images
         id: build
-        env:
-          DISK_TYPE: ${{ matrix.disk-type }}
-        run: |
-          IMAGE_REF="$IMAGE_REGISTRY/$IMAGE_NAME:$DEFAULT_TAG"
-          CONFIG="$GITHUB_WORKSPACE/disk_config/disk.toml"
-          if [[ "$DISK_TYPE" == anaconda-iso ]]; then
-            CONFIG="$RUNNER_TEMP/iso.toml"
-          fi
-          OUTPUT_DIR="$RUNNER_TEMP/output/$DESKTOP/$DISK_TYPE"
-          mkdir -p "$OUTPUT_DIR"
-          sudo podman pull "$IMAGE_REF"
-          sudo podman run --rm --privileged --pull=newer --net=host \
-            --security-opt label=type:unconfined_t \
-            -v "$CONFIG:/config.toml:ro" \
-            -v "$OUTPUT_DIR:/output" \
-            -v /var/lib/containers/storage:/var/lib/containers/storage \
-            "$BIB_IMAGE" build "$IMAGE_REF" \
-            --type "$DISK_TYPE" --config /config.toml --output /output --use-librepo --rootfs=btrfs \
-            --chown "$USER_UID:$USER_GID"
-          echo "output-directory=$OUTPUT_DIR" >> "$GITHUB_OUTPUT"
+        uses: osbuild/bootc-image-builder-action@8661cd3832544ad68c12dcde8681b13ab0f56a8d # main
+        with:
+          builder-image: ${{ env.BIB_IMAGE }}
+          config-file: ${{ matrix.disk-type == 'anaconda-iso' && format('./disk_config/iso-{0}.toml', matrix.desktop) || './disk_config/disk.toml' }}
+          image: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}
+          chown: ${{ env.USER_UID }}:${{ env.USER_GID }}
+          rootfs: btrfs
+          types: ${{ matrix.disk-type }}
+          additional-args: --use-librepo=True
 
       - name: Upload disk images and Checksum to Job Artifacts
         if: inputs.upload-to-s3 != true && github.event_name != 'pull_request'

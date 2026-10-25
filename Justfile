@@ -1,9 +1,8 @@
 # DESKTOP selects defaults; the third positional argument can override it.
 export desktop := env("DESKTOP", "gnome")
 export image_name := env("IMAGE_NAME", "justin-bazzite-dx" + if desktop == "kde" { "-kde" } else { "" })
-export image_registry := env("IMAGE_REGISTRY", "ghcr.io/justinschwerdtfeger")
 export default_tag := env("DEFAULT_TAG", "latest")
-export bib_image := env("BIB_IMAGE", trim(read("disk_config/builder-image")))
+export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest")
 
 alias build-vm := build-qcow2
 alias rebuild-vm := rebuild-qcow2
@@ -118,7 +117,7 @@ _rootful_load_image $target_image=image_name $tag=default_tag:
         just sudoif podman pull "${target_image}:${tag}"
     fi
 
-# Convert a local image with the pinned BIB CLI (requires privileged Podman).
+# Convert a local image using the template's privileged Bootc Image Builder flow.
 _build-bib $target_image $tag $type $config $variant=desktop: (_rootful_load_image target_image tag)
     #!/usr/bin/env bash
     set -euo pipefail
@@ -130,19 +129,7 @@ _build-bib $target_image $tag $type $config $variant=desktop: (_rootful_load_ima
     BUILDTMP=$(mktemp -p "${PWD}" -d -t _build-bib.XXXXXXXXXX)
     trap 'just sudoif rm -rf -- "$BUILDTMP"' EXIT
     mkdir -p "$BUILDTMP/output"
-    config_path=$(realpath "$config")
-    if [[ "$type" == anaconda-iso ]]; then
-        # Local tags follow the matching published image after installation.
-        # INSTALL_IMAGE overrides this for a custom registry or digest.
-        case "$target_image" in
-            localhost/*) install_ref="$image_registry/${target_image#localhost/}:$tag" ;;
-            */*) install_ref="$target_image:$tag" ;;
-            *) install_ref="$image_registry/$target_image:$tag" ;;
-        esac
-        python3 build_files/render-iso-config.py "${INSTALL_IMAGE:-$install_ref}" \
-            "$BUILDTMP/config.toml" --template "$config_path"
-        config_path="$BUILDTMP/config.toml"
-    fi
+    config_path=$(realpath -e "$config")
 
     just sudoif podman run \
         --rm --privileged --pull=newer --net=host \
@@ -170,7 +157,7 @@ build-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag $variant=
 build-raw $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_build-bib target_image tag "raw" "disk_config/disk.toml" variant)
 
 [group('Build Virtual Machine Image')]
-build-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_build-bib target_image tag "anaconda-iso" "disk_config/iso.toml" variant)
+build-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_build-bib target_image tag "anaconda-iso" ("disk_config/iso-" + variant + ".toml") variant)
 
 [group('Build Virtual Machine Image')]
 rebuild-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_rebuild-bib target_image tag "qcow2" "disk_config/disk.toml" variant)
@@ -179,7 +166,7 @@ rebuild-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag $varian
 rebuild-raw $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_rebuild-bib target_image tag "raw" "disk_config/disk.toml" variant)
 
 [group('Build Virtual Machine Image')]
-rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_rebuild-bib target_image tag "anaconda-iso" "disk_config/iso.toml" variant)
+rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_rebuild-bib target_image tag "anaconda-iso" ("disk_config/iso-" + variant + ".toml") variant)
 
 # Run a virtual machine with the specified image type and configuration
 _run-vm $target_image $tag $type $config $variant=desktop:
@@ -234,7 +221,7 @@ run-vm-raw $target_image=("localhost/" + image_name) $tag=default_tag $variant=d
 
 # Run a virtual machine from an ISO
 [group('Run Virtal Machine')]
-run-vm-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_run-vm target_image tag "iso" "disk_config/iso.toml" variant)
+run-vm-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_run-vm target_image tag "iso" ("disk_config/iso-" + variant + ".toml") variant)
 
 # Run a virtual machine using systemd-vmspawn
 [group('Run Virtal Machine')]

@@ -55,10 +55,10 @@ in [`build_files/build.sh`](build_files/build.sh). Both variants use the same
 
 ## Build locally
 
-Required: `just`, Podman, standard GNU shell utilities, and Python 3.11+ for ISO
-configuration generation. Disk builds additionally require privileged rootful
-Podman and sudo access (or a root shell). Container builds can use rootless
-Podman. The recipes do not install host tools. Run `just lint` with ShellCheck
+Required: `just`, Podman, and standard GNU shell utilities. Disk builds
+additionally require privileged rootful Podman and sudo access (or a root shell).
+Container builds can use rootless Podman. The recipes do not install host tools.
+Run `just lint` with ShellCheck
 installed, and `just check` to check Justfile formatting.
 
 ```bash
@@ -108,10 +108,12 @@ output/kde/localhost_justin-bazzite-dx-kde/latest/qcow2/disk.qcow2
 `just spawn-vm 0 qcow2 6G [image] [tag] [desktop]`. The other VM recipes use
 QEMU in Podman and require `/dev/kvm`.
 
-Both local disk builds and disk CI use the official builder digest in
-[`disk_config/builder-image`](disk_config/builder-image), with the explicit
-`build IMAGE --type TYPE --config /config.toml --output /output` CLI. Local builds
-can override it with `BIB_IMAGE`, using a version compatible with that CLI.
+Disk builds follow the [Universal Blue image template](https://github.com/ublue-os/image-template):
+CI uses its pinned `osbuild/bootc-image-builder-action`, which builds the disk
+images and generates checksums. Local Just recipes run the same Bootc Image
+Builder container through privileged Podman. Both default to
+`quay.io/centos-bootc/bootc-image-builder:latest`; local builds can override that
+with `BIB_IMAGE`.
 `just build-iso` requests **anaconda-iso**; `iso` remains the friendly recipe name.
 The local rootless image is streamed into rootful Podman when needed, without
 requiring localhost SSH or Podman scp configuration. A host without working
@@ -124,27 +126,21 @@ that mount. Installing another host package does not resolve this restriction.
 
 ### Installer update target
 
-[`disk_config/iso.toml`](disk_config/iso.toml) is a shared template. Both local
-recipes and CI render its `@IMAGE_REF@` placeholder using
-[`build_files/render-iso-config.py`](build_files/render-iso-config.py), so the
-installed system follows the intended registry image. The former desktop ISO
-files containing fixed registry names have been replaced by this one template.
-The installer enables the normal storage, networking, users, and desktop setup
-modules for both variants.
+Like the upstream template, we keep separate
+[`iso-gnome.toml`](disk_config/iso-gnome.toml) and
+[`iso-kde.toml`](disk_config/iso-kde.toml) files. Both enable installer user and
+network configuration: our GNOME base lacks the first-login setup assumed by the
+upstream GNOME config. Both local Just recipes and CI select the file for
+the requested desktop. No configuration renderer or Python dependency is needed.
 
-For local builds, `localhost/name:tag` (or an unqualified name) defaults to
-`IMAGE_REGISTRY/name:tag`, where `IMAGE_REGISTRY` defaults to
-`ghcr.io/justinschwerdtfeger`. A fully qualified registry image keeps its reference.
-Set `INSTALL_IMAGE` to override the installed system's update source independently
-of the local build tag, including when that local tag is unpublished:
-
-```bash
-INSTALL_IMAGE=ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest \
-  just build-iso localhost/my-kde dev kde
-```
-
-Use a registry image that exists and matches the desktop being installed.
-CI derives the target directly from its selected published image and tag.
+Their Kickstart `bootc switch` commands set the installed system's update source:
+GNOME follows `ghcr.io/justinschwerdtfeger/justin-bazzite-dx:latest`, and KDE follows
+`ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest`. These targets are fixed
+in the selected TOML file, independently of the image name/tag passed to the disk
+builder. A local development ISO therefore follows the corresponding published
+`latest` image after installation. Edit the selected config's registry target
+when publishing a fork or using a different update channel; changing `IMAGE_NAME`
+or `DEFAULT_TAG` alone does not change the installer target.
 
 ## CI and build caching
 
@@ -162,6 +158,8 @@ invalidates that layer when package settings change. Local Just builds calculate
 the same hash. Changes to the shell installer or initramfs script use separate
 contexts so they can reuse package installation. Artwork is copied before
 dracut runs. Choose **fresh-build** in the container workflow to ignore caches.
+Local builds lock the shared package cache and logs while using them, so parallel
+desktop builds cannot delete each other's cached RPMs during installation.
 
 Package installs are grouped by repository availability. Each Copr is enabled
 only for its own packages, and Terra is disabled for the remaining development
@@ -178,7 +176,7 @@ container changes. Publish both containers before building disks for a new repo.
 To enable publishing in a fork, generate a Cosign key pair, keep `cosign.pub` in
 the repository, and store the unencrypted private key as the `SIGNING_SECRET`
 Actions secret. Never commit `cosign.key`. Workflow image names default to your
-repository name; adjust local `IMAGE_NAME`/`IMAGE_REGISTRY` for your fork.
+repository name; adjust local `IMAGE_NAME` and both ISO registry targets for your fork.
 
 Optional S3 uploads use `S3_PROVIDER`, `S3_BUCKET_NAME`, `S3_ACCESS_KEY_ID`,
 `S3_SECRET_ACCESS_KEY`, `S3_REGION`, and `S3_ENDPOINT` Actions secrets. Without
