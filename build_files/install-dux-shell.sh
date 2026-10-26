@@ -42,10 +42,13 @@ if [[ -z "${DESTDIR:-}" ]]; then
   if [[ "${DESKTOP:-gnome}" == kde ]]; then
     # KService needs Plasma's menu to discover applications outside Plasma.
     test -f /etc/xdg/menus/plasma-applications.menu
-    cat > /usr/lib/systemd/user/niri.service.d/20-kde.conf <<'EOF'
+    for service in niri dms; do
+      install -d "/usr/lib/systemd/user/$service.service.d"
+      cat > "/usr/lib/systemd/user/$service.service.d/20-kde.conf" <<'EOF'
 [Service]
 Environment=XDG_MENU_PREFIX=plasma-
 EOF
+    done
     # Keep Niri's other portal backends, including GNOME screen sharing.
     portal_defaults=/usr/share/xdg-desktop-portal/niri-portals.conf
     grep -qx '\[preferred\]' "$portal_defaults"

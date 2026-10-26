@@ -211,36 +211,39 @@ S3, disk images are available as Actions artifacts.
 Both images include `qt5ct`, `qt6ct`, and the Qt5/Qt6 plugins for
 [qtengine](https://github.com/kossLAN/qtengine), installed from the
 [desertedman/qtengine Copr](https://copr.fedorainfracloud.org/coprs/desertedman/qtengine/).
-The Niri session selects `qtengine` for both Qt versions automatically. It is a
+The Niri and Dux Shell services select `qtengine` for both Qt versions. It is a
 plugin loaded by Qt applications, so there is no `qtengine` command to run.
 Enable **Apply Qt Themes** in DMS's **Theme & Colors** settings to generate its
-colors. Installation alone does not enable Dux's qtengine detection: the running
-shell must inherit the theme selection.
+colors. Applications launched directly by Niri or Dux inherit those defaults.
 
-Niri's systemd service imports the theme selection into the systemd user manager
-and D-Bus activation environment before starting the compositor, Dux Shell, or
-portals. On logout (including a failed compositor start), it restores the previous
-values. The KDE image also sets `XDG_MENU_PREFIX=plasma-` for Dolphin application
-discovery and uses the KDE file chooser while retaining GNOME screen sharing.
-The native GNOME and Plasma sessions keep their own theme integration.
+The KDE file picker service uses the `kde` platform theme and Wayland, so it
+follows KDE's appearance settings in both Niri and Plasma. On the KDE image,
+Niri and Dux also set `XDG_MENU_PREFIX=plasma-` for Dolphin application discovery.
+Niri uses the KDE file chooser while retaining GNOME screen sharing.
 
-To override the Niri theme selection, create `~/.config/dux-shell/niri.env`
-(or `$XDG_CONFIG_HOME/dux-shell/niri.env`) with environment assignments, for example
-to follow Plasma's theme settings:
+These are ordinary systemd service overrides. They do not change the user
+manager or D-Bus activation environment, and need no logout cleanup. The native
+GNOME and Plasma sessions retain their Qt defaults; Dux uses qtengine whenever
+its service is started. Separately activated applications use their own service
+environment.
+
+To change a service's theme, use `systemctl --user edit niri.service` or
+`systemctl --user edit dms.service`, for example:
 
 ```ini
-QT_QPA_PLATFORMTHEME=kde
-QT_QPA_PLATFORMTHEME_QT6=kde
+[Service]
+Environment=QT_QPA_PLATFORMTHEME=kde
+Environment=QT_QPA_PLATFORMTHEME_QT6=kde
 ```
 
-For qt5ct/qt6ct, use `QT_QPA_PLATFORMTHEME=qt5ct` and
-`QT_QPA_PLATFORMTHEME_QT6=qt6ct`. Log out and back into Niri after changing this
-file. Variables set only in Niri's `environment {}` block do not reach
-systemd-started Dux Shell or portals. An unconditional
-`~/.config/environment.d/90-dms.conf` applies to other desktops too; remove any
-old Niri-only theme assignments there if you want separate desktop settings.
+Change both services to keep their launched applications consistent, then log
+out and back in. Variables set only in Niri's `environment {}` block do not
+reach Dux or portals. Remove old Niri-only assignments from
+`~/.config/environment.d/90-dms.conf` if you previously added them there, since
+that file applies to other desktops too.
 
 For diagnosis, run `rpm -q qtengine` and `dms doctor` from a Niri terminal. Check
-`systemctl --user show-environment` for both `QT_QPA_PLATFORMTHEME` variables;
-both should be `qtengine` unless overridden. See the
+`systemctl --user show niri.service dms.service -p Environment` for the service
+defaults. The picker can be inspected with
+`systemctl --user cat plasma-xdg-desktop-portal-kde.service`. See the
 [DMS application theming guide](https://duxlabs.dev/docs/dankmaterialshell/application-themes/).
