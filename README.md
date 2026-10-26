@@ -211,8 +211,36 @@ S3, disk images are available as Actions artifacts.
 Both images include `qt5ct`, `qt6ct`, and the Qt5/Qt6 plugins for
 [qtengine](https://github.com/kossLAN/qtengine), installed from the
 [desertedman/qtengine Copr](https://copr.fedorainfracloud.org/coprs/desertedman/qtengine/).
-To use qtengine in your DMS session, set `QT_QPA_PLATFORMTHEME=qtengine` in
-`~/.config/environment.d/90-dms.conf`, then log out and back in. Enable **Apply Qt
-Themes** in DMS's **Theme & Colors** settings. You can instead select `qt5ct` or
-`qt6ct` in your session configuration. See the
+The Niri session selects `qtengine` for both Qt versions automatically. It is a
+plugin loaded by Qt applications, so there is no `qtengine` command to run.
+Enable **Apply Qt Themes** in DMS's **Theme & Colors** settings to generate its
+colors. Installation alone does not enable Dux's qtengine detection: the running
+shell must inherit the theme selection.
+
+Niri's systemd service imports the theme selection into the systemd user manager
+and D-Bus activation environment before starting the compositor, Dux Shell, or
+portals. On logout (including a failed compositor start), it restores the previous
+values. The KDE image also sets `XDG_MENU_PREFIX=plasma-` for Dolphin application
+discovery and uses the KDE file chooser while retaining GNOME screen sharing.
+The native GNOME and Plasma sessions keep their own theme integration.
+
+To override the Niri theme selection, create `~/.config/dux-shell/niri.env`
+(or `$XDG_CONFIG_HOME/dux-shell/niri.env`) with environment assignments, for example
+to follow Plasma's theme settings:
+
+```ini
+QT_QPA_PLATFORMTHEME=kde
+QT_QPA_PLATFORMTHEME_QT6=kde
+```
+
+For qt5ct/qt6ct, use `QT_QPA_PLATFORMTHEME=qt5ct` and
+`QT_QPA_PLATFORMTHEME_QT6=qt6ct`. Log out and back into Niri after changing this
+file. Variables set only in Niri's `environment {}` block do not reach
+systemd-started Dux Shell or portals. An unconditional
+`~/.config/environment.d/90-dms.conf` applies to other desktops too; remove any
+old Niri-only theme assignments there if you want separate desktop settings.
+
+For diagnosis, run `rpm -q qtengine` and `dms doctor` from a Niri terminal. Check
+`systemctl --user show-environment` for both `QT_QPA_PLATFORMTHEME` variables;
+both should be `qtengine` unless overridden. See the
 [DMS application theming guide](https://duxlabs.dev/docs/dankmaterialshell/application-themes/).

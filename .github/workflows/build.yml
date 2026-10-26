@@ -8,6 +8,7 @@ on:
       - 'Containerfile'
       - 'build_files/**'
       - 'system_files/**'
+      - '.github/scripts/test-niri-environment.py'
       - '.github/workflows/build.yml'
   schedule:
     - cron: '05 10 * * *'  # 10:05am UTC everyday
@@ -18,6 +19,7 @@ on:
       - 'Containerfile'
       - 'build_files/**'
       - 'system_files/**'
+      - '.github/scripts/test-niri-environment.py'
       - '.github/workflows/build.yml'
   workflow_dispatch:
     inputs:
@@ -74,7 +76,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check shell scripts
-        run: shellcheck build_files/*.sh build_files/packages/*.sh system_files/usr/libexec/dux-niri-setup
+        run: shellcheck build_files/*.sh build_files/packages/*.sh system_files/usr/libexec/*
+
+      - name: Check Niri session environment
+        run: python3 .github/scripts/test-niri-environment.py
 
       - name: Maximize build space
         uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6

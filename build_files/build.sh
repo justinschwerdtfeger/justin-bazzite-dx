@@ -57,7 +57,7 @@ dnf5 -y install \
   pipx python3-devel \
   qt5ct qt6ct \
   brightnessctl \
-  foot wl-clipboard \
+  foot wl-clipboard dbus-tools \
   xdg-desktop-portal-gtk xdg-desktop-portal-gnome gnome-keyring \
   wget file
 rpm -q chezmoi
