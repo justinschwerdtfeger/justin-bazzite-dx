@@ -1,0 +1,13 @@
+[Unit]
+Description=Noctalia Shell
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/noctalia
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=niri.service

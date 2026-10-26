@@ -1,0 +1,38 @@
+#!/bin/bash
+
+set -euo pipefail
+
+case "${1:-}" in
+  dms) selected=dms.service; executable=dms ;;
+  noctalia) selected=noctalia.service; executable=noctalia ;;
+  none) selected=; executable= ;;
+  *) echo "Usage: ujust niri-shell dms|noctalia|none" >&2; exit 1 ;;
+esac
+[[ $# == 1 ]] || { echo "Expected one shell name." >&2; exit 1; }
+[[ $EUID != 0 ]] || { echo "Run this as your desktop user, without sudo." >&2; exit 1; }
+
+if [[ -n "$executable" ]] && ! command -v "$executable" >/dev/null; then
+  echo "Cannot select $1: $executable is not installed." >&2
+  exit 1
+fi
+systemctl --user show-environment >/dev/null
+
+systemctl --user disable dms.service noctalia.service
+for unit in dms.service noctalia.service; do
+  if [[ "$unit" != "$selected" ]]; then
+    systemctl --user mask --now "$unit"
+  fi
+done
+
+if [[ -n "$selected" ]]; then
+  systemctl --user unmask "$selected"
+  systemctl --user add-wants niri.service "$selected"
+  if systemctl --user is-active --quiet niri.service; then
+    systemctl --user start "$selected"
+  fi
+fi
+
+echo "Niri shell: $1 (saved for future logins)."
+if ! systemctl --user is-active --quiet niri.service; then
+  echo "The selection will take effect when you next log into Niri."
+fi

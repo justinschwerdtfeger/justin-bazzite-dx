@@ -1,7 +1,5 @@
 include "upstream.kdl"
 
-spawn-at-startup "systemctl" "--user" "start" "dms.service"
-
 prefer-no-csd
 hotkey-overlay {
     skip-at-startup
