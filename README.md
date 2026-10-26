@@ -42,6 +42,28 @@ Existing Niri paths and `NIRI_CONFIG` overrides are preserved; image updates
 leave user settings alone. To switch an existing setup, run `dms setup`, which
 backs up its configuration.
 
+Dux Shell starts through Niri's systemd service, including for users with an
+existing Niri configuration. To choose a different shell, run one of these
+commands as your desktop user, without sudo:
+
+```bash
+ujust niri-shell noctalia
+ujust niri-shell dms
+ujust niri-shell none
+```
+
+The command stops and masks the unselected shell services, and starts the selected
+shell immediately if Niri is running. Outside Niri, it saves the choice for the
+next Niri login. The selection is per user, survives image updates, and does not
+enable either shell for GNOME or KDE sessions. `none` stops both shells and
+prevents them from starting; select `dms` or `noctalia` to reverse it.
+
+Your Niri configuration is preserved. The supplied launcher, lock, and other
+shell shortcuts call DMS; configure Noctalia shortcuts in your own Niri config
+when switching. Remove any custom commands that launch either shell directly;
+service masks also block the older default's `systemctl --user start dms.service`
+line, but cannot block a direct `dms run` or `noctalia` command.
+
 Each image build uses the installed Niri package's defaults with Dux Shell
 integration. Navigation shortcuts and application window rules follow upstream.
 **Super+Space** opens the launcher, **Super+Return** opens Foot,
