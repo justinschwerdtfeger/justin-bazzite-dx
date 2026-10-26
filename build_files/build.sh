@@ -53,12 +53,14 @@ dnf5 -y install \
   gcc gcc-c++ make ncurses xz perl \
   wlsunset \
   ripgrep fd-find tree-sitter-cli neovim python3-neovim \
+  chezmoi \
   pipx python3-devel \
   qt5ct qt6ct \
   brightnessctl \
   foot wl-clipboard \
   xdg-desktop-portal-gtk xdg-desktop-portal-gnome gnome-keyring \
   wget file
+rpm -q chezmoi
 # Niri shares the screen-sharing portal and keyring on both desktops.
 # File managers and the file chooser backend follow the desktop variant.
 if (( ${#DESKTOP_PACKAGES[@]} )); then
