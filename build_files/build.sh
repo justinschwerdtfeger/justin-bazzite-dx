@@ -76,7 +76,19 @@ dnf5 -y copr disable desertedman/qtengine
 
 # Terra packages share a transaction; keep Terra disabled for other installs.
 dnf5 -y config-manager setopt terra.enabled=1
-dnf5 -y install noctalia cliphist cursor
+# Cached metalinks can disagree with repomd.xml while Terra is publishing.
+# Refresh and retry metadata only; never silently skip this required repository.
+for attempt in 1 2 3; do
+  if dnf5 --refresh --repo=terra --setopt=terra.skip_if_unavailable=false makecache; then
+    break
+  fi
+  if (( attempt == 3 )); then
+    echo "Terra metadata is still unavailable after 3 attempts." >&2
+    exit 1
+  fi
+  sleep 10
+done
+dnf5 -y --setopt=terra.skip_if_unavailable=false install noctalia cliphist cursor
 dnf5 -y config-manager setopt terra.enabled=0
 
 dnf5 -y copr enable daniel-g-carrasco/wayland-scroll-factor
