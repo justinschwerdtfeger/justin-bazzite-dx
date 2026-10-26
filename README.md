@@ -233,8 +233,39 @@ S3, disk images are available as Actions artifacts.
 Both images include `qt5ct`, `qt6ct`, and the Qt5/Qt6 plugins for
 [qtengine](https://github.com/kossLAN/qtengine), installed from the
 [desertedman/qtengine Copr](https://copr.fedorainfracloud.org/coprs/desertedman/qtengine/).
-To use qtengine in your DMS session, set `QT_QPA_PLATFORMTHEME=qtengine` in
-`~/.config/environment.d/90-dms.conf`, then log out and back in. Enable **Apply Qt
-Themes** in DMS's **Theme & Colors** settings. You can instead select `qt5ct` or
-`qt6ct` in your session configuration. See the
+The Niri and Dux Shell services select `qtengine` for both Qt versions. It is a
+plugin loaded by Qt applications, so there is no `qtengine` command to run.
+Enable **Apply Qt Themes** in DMS's **Theme & Colors** settings to generate its
+colors. Applications launched directly by Niri or Dux inherit those defaults.
+
+The KDE file picker service uses the `kde` platform theme and Wayland, so it
+follows KDE's appearance settings in both Niri and Plasma. On the KDE image,
+Niri and Dux also set `XDG_MENU_PREFIX=plasma-` for Dolphin application discovery.
+Niri uses the KDE file chooser while retaining GNOME screen sharing.
+
+These are ordinary systemd service overrides. They do not change the user
+manager or D-Bus activation environment, and need no logout cleanup. The native
+GNOME and Plasma sessions retain their Qt defaults; Dux uses qtengine whenever
+its service is started. Separately activated applications use their own service
+environment.
+
+To change a service's theme, use `systemctl --user edit niri.service` or
+`systemctl --user edit dms.service`, for example:
+
+```ini
+[Service]
+Environment=QT_QPA_PLATFORMTHEME=kde
+Environment=QT_QPA_PLATFORMTHEME_QT6=kde
+```
+
+Change both services to keep their launched applications consistent, then log
+out and back in. Variables set only in Niri's `environment {}` block do not
+reach Dux or portals. Remove old Niri-only assignments from
+`~/.config/environment.d/90-dms.conf` if you previously added them there, since
+that file applies to other desktops too.
+
+For diagnosis, run `rpm -q qtengine` and `dms doctor` from a Niri terminal. Check
+`systemctl --user show niri.service dms.service -p Environment` for the service
+defaults. The picker can be inspected with
+`systemctl --user cat plasma-xdg-desktop-portal-kde.service`. See the
 [DMS application theming guide](https://duxlabs.dev/docs/dankmaterialshell/application-themes/).
