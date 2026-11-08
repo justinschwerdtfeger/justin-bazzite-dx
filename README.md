@@ -4,9 +4,9 @@ Two x86_64 desktop variants share the same packages, artwork, niri integration,
 and prebuilt Dux Shell:
 
 - **GNOME + niri** (default): `ghcr.io/justinschwerdtfeger/justin-bazzite-dx-gnome:latest`,
-  based on `ghcr.io/ublue-os/bazzite-dx-gnome:stable-44`.
+  based on `ghcr.io/ublue-os/bazzite-dx-gnome:stable-45`.
 - **KDE Plasma + niri**: `ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest`,
-  based on `ghcr.io/ublue-os/bazzite-dx:stable-44`.
+  based on `ghcr.io/ublue-os/bazzite-dx:stable-45`.
 
 The [upstream Bazzite DX project](https://github.com/ublue-os/bazzite-dx)
 uses the unsuffixed image name for KDE. This repository publishes the same
@@ -71,8 +71,9 @@ integration. Navigation shortcuts and application window rules follow upstream.
 **Super+E** opens Nautilus on GNOME or Dolphin on KDE, and **Super+Alt+L** locks
 the screen. 
 
-GNOME Keyring and the GTK/GNOME portals are shared for Niri's secrets and screen
-sharing. Desktop-specific package additions and removals belong in
+Niri uses **oo7** for secrets and selects its Secret portal for sandboxed
+applications.
+Desktop-specific package additions and removals belong in
 [`build_files/packages/gnome.sh`](build_files/packages/gnome.sh) or
 [`build_files/packages/kde.sh`](build_files/packages/kde.sh). Most packages remain
 in [`build_files/build.sh`](build_files/build.sh). Both variants use the same

@@ -58,7 +58,7 @@ dnf5 -y install \
   qt5ct qt6ct \
   brightnessctl \
   foot wl-clipboard \
-  xdg-desktop-portal-gtk xdg-desktop-portal-gnome gnome-keyring \
+  xdg-desktop-portal-gtk xdg-desktop-portal-gnome \
   wget file
 rpm -q chezmoi
 # Niri shares the screen-sharing portal and keyring on both desktops.

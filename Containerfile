@@ -1,8 +1,8 @@
 ARG DESKTOP=gnome
 
 # Upstream names KDE's image bazzite-dx; retain GNOME as the default.
-FROM ghcr.io/ublue-os/bazzite-dx-gnome:stable-44 AS base-gnome
-FROM ghcr.io/ublue-os/bazzite-dx:stable-44 AS base-kde
+FROM ghcr.io/ublue-os/bazzite-dx-gnome:stable-45 AS base-gnome
+FROM ghcr.io/ublue-os/bazzite-dx:stable-45 AS base-kde
 
 # Keep script contexts separate so shell/initramfs edits don't invalidate packages.
 # Bind mounts keep the scripts out of the final image.
