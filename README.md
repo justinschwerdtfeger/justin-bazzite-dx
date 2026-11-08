@@ -209,6 +209,10 @@ tools. The prebuilt Dux Shell is refreshed after initramfs generation on every
 build. The final shell install and `bootc container lint` share a layer. Each
 published image digest is signed once for all its tags.
 
+Both desktops include Helium's `helium-bin` RPM from the official
+[`imput/helium` Copr](https://helium.surf/download), including its launcher and
+icons. Helium updates arrive through image builds; no AppImage is needed.
+
 [`build-disk.yml`](.github/workflows/build-disk.yml) builds QCOW2 and Anaconda ISO
 artifacts for both published desktops on amd64, using the explicit `-gnome` and
 `-kde` image names. Artifact names and S3 prefixes

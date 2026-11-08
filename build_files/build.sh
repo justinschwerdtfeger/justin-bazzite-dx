@@ -93,6 +93,12 @@ dnf5 -y copr enable daniel-g-carrasco/wayland-scroll-factor
 dnf5 -y install wayland-scroll-factor
 dnf5 -y copr disable daniel-g-carrasco/wayland-scroll-factor
 
+# Install Helium from its official Copr
+dnf5 -y copr enable imput/helium
+dnf5 -y install helium-bin
+rpm -q helium-bin
+dnf5 -y copr disable imput/helium
+
 # Install Vicinae from Copr
 dnf5 -y copr enable quadratech188/vicinae
 dnf5 -y install vicinae
