@@ -4,6 +4,21 @@ ARG DESKTOP=gnome
 FROM ghcr.io/ublue-os/bazzite-dx-gnome:stable-45 AS base-gnome
 FROM ghcr.io/ublue-os/bazzite-dx:stable-45 AS base-kde
 
+# The QtEngine Copr only publishes Fedora 44 binaries. Build the same release
+# against Fedora 45's Qt libraries, keeping compilers and headers out of the OS.
+FROM registry.fedoraproject.org/fedora:45 AS qtengine_builder
+COPY build_files/qtengine/ /tmp/qtengine/
+ARG PACKAGE_REFRESH=local
+RUN test -n "$PACKAGE_REFRESH" && \
+    dnf5 -y --setopt=install_weak_deps=False install rpm-build dnf5-plugins curl && \
+    dnf5 -y --setopt=install_weak_deps=False builddep /tmp/qtengine/qtengine.spec && \
+    mkdir -p /tmp/qtengine/rpmbuild/SOURCES && \
+    curl --fail --location --retry 3 \
+      https://github.com/kossLAN/qtengine/archive/167e7d9a27cdc8005ef2bd4d5d317b9da01b853f.tar.gz \
+      -o /tmp/qtengine/rpmbuild/SOURCES/qtengine-0.2.2.tar.gz && \
+    rpmbuild -bb --define '_topdir /tmp/qtengine/rpmbuild' /tmp/qtengine/qtengine.spec && \
+    mkdir /rpms && cp /tmp/qtengine/rpmbuild/RPMS/*/qtengine-0.2.2-*.rpm /rpms/
+
 # Keep script contexts separate so shell/initramfs edits don't invalidate packages.
 # Bind mounts keep the scripts out of the final image.
 FROM scratch AS packages_ctx
@@ -41,6 +56,7 @@ ARG PACKAGE_REFRESH=local
 ARG PACKAGE_SCRIPT_SHA=local
 # DNF deletes cached RPMs after installing them; concurrent builds must wait.
 RUN --mount=type=bind,from=packages_ctx,source=/,target=/ctx \
+    --mount=type=bind,from=qtengine_builder,source=/rpms,target=/qtengine-rpms \
     --mount=type=cache,dst=/var/cache,sharing=locked \
     --mount=type=cache,dst=/var/log,sharing=locked \
     --mount=type=tmpfs,dst=/tmp \

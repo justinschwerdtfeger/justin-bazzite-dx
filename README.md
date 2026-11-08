@@ -232,8 +232,12 @@ S3, disk images are available as Actions artifacts.
 ## DMS application theming
 
 Both images include `qt5ct`, `qt6ct`, and the Qt5/Qt6 plugins for
-[qtengine](https://github.com/kossLAN/qtengine), installed from the
-[desertedman/qtengine Copr](https://copr.fedorainfracloud.org/coprs/desertedman/qtengine/).
+[qtengine](https://github.com/kossLAN/qtengine). The container build packages
+the pinned 0.2.2 source release against Fedora 45's Qt libraries in a separate
+build stage, since the desertedman/qtengine Copr only offers Fedora 44 builds.
+The source archive is verified with SHA-256; build dependencies stay out of the
+final images. Update `build_files/qtengine/qtengine.spec` and the matching
+Containerfile download when changing the pinned release.
 The Niri and Dux Shell services select `qtengine` for both Qt versions. It is a
 plugin loaded by Qt applications, so there is no `qtengine` command to run.
 Enable **Apply Qt Themes** in DMS's **Theme & Colors** settings to generate its
