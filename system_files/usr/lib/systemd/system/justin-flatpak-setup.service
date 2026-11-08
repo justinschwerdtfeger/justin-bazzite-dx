@@ -1,0 +1,10 @@
+[Unit]
+Description=Install initial Bazzite Flatpak defaults
+Wants=bazzite-flatpak-manager.service
+After=network-online.target bazzite-flatpak-manager.service
+ConditionPathExists=/etc/justin-flatpak-setup-pending
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/justin-flatpak-setup
+TimeoutStartSec=2h

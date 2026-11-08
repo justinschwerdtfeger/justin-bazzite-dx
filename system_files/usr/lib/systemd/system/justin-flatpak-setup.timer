@@ -1,0 +1,10 @@
+[Unit]
+Description=Retry initial Bazzite Flatpak setup
+ConditionPathExists=/etc/justin-flatpak-setup-pending
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+
+[Install]
+WantedBy=timers.target

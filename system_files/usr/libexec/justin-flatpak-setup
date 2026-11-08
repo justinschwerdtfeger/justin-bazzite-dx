@@ -1,0 +1,34 @@
+#!/bin/bash
+
+set -euo pipefail
+
+pending=/etc/justin-flatpak-setup-pending
+[[ -f "$pending" ]] || exit 0
+
+# Match Bazzite's _install-system-flatpaks selection, failing closed on bad metadata.
+base_image=$(jq -er '."base-image-name"' /usr/share/ublue-os/image-info.json)
+case "$base_image" in
+  silverblue) desktop=gnome ;;
+  kinoite) desktop=kde ;;
+  *) echo "Unsupported Flatpak desktop base: $base_image" >&2; exit 1 ;;
+esac
+
+# Fetch once and fail on download errors before starting the transaction.
+manifest=$(curl --fail --location --silent --show-error \
+  --connect-timeout 20 --max-time 120 \
+  "https://raw.githubusercontent.com/ublue-os/bazzite/main/installer/${desktop}_flatpaks/flatpaks")
+[[ -n "$manifest" ]] || { echo "Empty Flatpak manifest." >&2; exit 1; }
+mapfile -t refs <<< "$manifest"
+for ref in "${refs[@]}"; do
+  if [[ ! "$ref" =~ ^(app|runtime)/[A-Za-z0-9_.-]+/[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$ ]]; then
+    echo "Invalid Flatpak manifest ref: $ref" >&2
+    exit 1
+  fi
+done
+
+echo "Installing Bazzite's $desktop Flatpak defaults."
+flatpak --system --noninteractive -y install --or-update flathub "${refs[@]}"
+
+# Keep failures retryable; success stays done even if users later remove defaults.
+rm -- "$pending"
+echo "Default Flatpak setup complete."

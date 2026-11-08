@@ -1,7 +1,10 @@
 [customizations.installer.kickstart]
 contents = """
 %post --erroronfail
+set -e
 bootc switch --mutate-in-place --transport registry ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest
+# Enroll only new ISO installations in the one-time Flatpak setup.
+touch /etc/justin-flatpak-setup-pending
 %end
 """
 
