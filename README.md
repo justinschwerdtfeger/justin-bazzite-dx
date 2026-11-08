@@ -208,6 +208,13 @@ Choose `anaconda-iso` in the workflow's **disk-type** input to build just the tw
 installers. Optional **gnome-digest** and **kde-digest** inputs accept verified
 `sha256:...` container digests; without them the workflow uses `latest`.
 Each artifact records its source reference in `source-image.txt`.
+
+Fedora 45 ships vendor repository files in `/usr/share/dnf5/repos.d`. Our
+container build also copies missing files into `/etc/yum.repos.d` for the disk
+builder's DNF4 resolver, preserving existing overrides. After changing this
+compatibility setup, rebuild and publish the containers before running disk CI;
+disk builds consume the published images.
+
 ISO checks verify BIOS/UEFI boot catalog entries and the embedded desktop update
 target, then boot the ISO's own kernel and initrd under QEMU with the ISO attached.
 The installer must reach its text installation summary. These checks cover

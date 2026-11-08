@@ -135,3 +135,14 @@ systemctl enable podman.socket
 if (( ${#DESKTOP_REMOVE_PACKAGES[@]} )); then
   dnf5 -y remove "${DESKTOP_REMOVE_PACKAGES[@]}"
 fi
+
+# Fedora 45 moved vendor repos here, but Bootc Image Builder's DNF4 solver
+# only reads /etc/yum.repos.d from the source image. Preserve local overrides.
+mkdir -p /etc/yum.repos.d
+for repo in /usr/share/dnf5/repos.d/*.repo; do
+  [[ -f "$repo" ]] || continue
+  target="/etc/yum.repos.d/${repo##*/}"
+  if [[ ! -e "$target" && ! -L "$target" ]]; then
+    cp "$repo" "$target"
+  fi
+done
