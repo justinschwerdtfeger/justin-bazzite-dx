@@ -68,11 +68,9 @@ if (( ${#DESKTOP_PACKAGES[@]} )); then
 fi
 dnf5 -y group install "c-development"
 
-# Install the packaged Qt5 and Qt6 theme plugins from Copr.
-dnf5 -y copr enable desertedman/qtengine
-dnf5 -y install qtengine
+# Install both theme plugins rebuilt against this Fedora release's Qt ABI.
+dnf5 -y install /qtengine-rpms/qtengine-*.rpm
 rpm -q qt5ct qt6ct qtengine
-dnf5 -y copr disable desertedman/qtengine
 
 # Terra packages share a transaction; keep Terra disabled for other installs.
 dnf5 -y config-manager setopt terra.enabled=1

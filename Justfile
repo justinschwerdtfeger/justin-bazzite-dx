@@ -88,7 +88,7 @@ build $target_image=image_name $tag=default_tag $variant=desktop:
         BUILD_ARGS+=("--build-arg" "SHA_HEAD_SHORT=$(git rev-parse --short HEAD)")
     fi
     # Buildah/Podman bind contexts need an explicit content hash in the cache key.
-    PACKAGE_SCRIPT_SHA=$(sha256sum build_files/build.sh build_files/packages/*.sh | sha256sum | cut -d ' ' -f 1)
+    PACKAGE_SCRIPT_SHA=$(sha256sum build_files/build.sh build_files/packages/*.sh build_files/qtengine/* | sha256sum | cut -d ' ' -f 1)
     INITRAMFS_SCRIPT_SHA=$(sha256sum build_files/build-initramfs.sh | cut -d ' ' -f 1)
 
     podman build \
