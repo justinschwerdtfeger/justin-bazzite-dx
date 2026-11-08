@@ -14,7 +14,7 @@ import tempfile
 import time
 
 
-def verify(iso, output, desktop):
+def verify(iso, output, desktop, gpu="default"):
     output.mkdir(parents=True, exist_ok=True)
     with (output / "iso-layout.log").open("w") as log:
         subprocess.run(
@@ -40,12 +40,13 @@ def verify(iso, output, desktop):
                 stdout=log, stderr=subprocess.STDOUT, check=True,
             )
         kickstart = "\n".join(p.read_text() for p in output.glob("*.ks"))
+        gpu_suffix = "" if gpu == "default" else f"-{gpu}"
         expected_target = (
             "bootc switch --mutate-in-place --transport registry "
-            f"ghcr.io/justinschwerdtfeger/justin-bazzite-dx-{desktop}:latest"
+            f"ghcr.io/justinschwerdtfeger/justin-bazzite-dx-{desktop}{gpu_suffix}:latest"
         )
         if expected_target not in kickstart:
-            raise RuntimeError("Installer update target does not match the desktop")
+            raise RuntimeError("Installer update target does not match the desktop and GPU")
         if "/run/install/repo/container" not in kickstart:
             raise RuntimeError("Missing embedded container installation source")
 
@@ -116,19 +117,20 @@ def main():
     parser.add_argument("iso", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("desktop", choices=("gnome", "kde"))
+    parser.add_argument("--gpu", choices=("default", "nvidia-open"), default="default")
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
     passed = False
     try:
-        verify(args.iso.resolve(strict=True), output, args.desktop)
+        verify(args.iso.resolve(strict=True), output, args.desktop, args.gpu)
         passed = True
         detail = "Installer summary reached and QEMU remained alive for 15 seconds"
     except (OSError, RuntimeError, subprocess.SubprocessError) as error:
         detail = str(error)
     result = {
-        "passed": passed, "desktop": args.desktop, "detail": detail,
+        "passed": passed, "desktop": args.desktop, "gpu": args.gpu, "detail": detail,
         "elapsed_seconds": round(time.monotonic() - started),
         "scope": "ISO layout, embedded update target, and installer runtime startup",
     }

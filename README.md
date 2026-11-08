@@ -1,16 +1,26 @@
 # Justin's Bazzite DX + niri
 
-Two x86_64 desktop variants share the same packages, artwork, niri integration,
-and prebuilt Dux Shell:
+GNOME and KDE each have default and NVIDIA Open x86_64 images. All four share
+the same packages, artwork, niri integration, and prebuilt Dux Shell:
 
 - **GNOME + niri** (default): `ghcr.io/justinschwerdtfeger/justin-bazzite-dx-gnome:latest`,
   based on `ghcr.io/ublue-os/bazzite-dx-gnome:stable-45`.
 - **KDE Plasma + niri**: `ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest`,
   based on `ghcr.io/ublue-os/bazzite-dx:stable-45`.
+- **GNOME + niri + NVIDIA Open**:
+  `ghcr.io/justinschwerdtfeger/justin-bazzite-dx-gnome-nvidia-open:latest`,
+  based on `ghcr.io/ublue-os/bazzite-dx-nvidia-gnome:stable-45`.
+- **KDE Plasma + niri + NVIDIA Open**:
+  `ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde-nvidia-open:latest`,
+  based on `ghcr.io/ublue-os/bazzite-dx-nvidia:stable-45`.
+
+Upstream's DX `nvidia` images use NVIDIA's open kernel modules, despite lacking
+`open` in their names. These require a supported Turing or newer GPU; older
+NVIDIA cards need a different driver variant.
 
 The [upstream Bazzite DX project](https://github.com/ublue-os/bazzite-dx)
 uses the unsuffixed image name for KDE. This repository publishes the same
-**GNOME** image as both `justin-bazzite-dx-gnome` (primary) and
+default **GNOME** image as both `justin-bazzite-dx-gnome` (primary) and
 `justin-bazzite-dx` (compatibility alias). Both names have identical digests and
 are signed; publishing the alias does not build another image.
 Only x86_64/amd64 is supported;
@@ -26,6 +36,10 @@ installed desktop:
 sudo bootc switch --transport registry ghcr.io/justinschwerdtfeger/justin-bazzite-dx-gnome:latest
 # KDE
 sudo bootc switch --transport registry ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest
+# GNOME with NVIDIA Open
+sudo bootc switch --transport registry ghcr.io/justinschwerdtfeger/justin-bazzite-dx-gnome-nvidia-open:latest
+# KDE with NVIDIA Open
+sudo bootc switch --transport registry ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde-nvidia-open:latest
 ```
 
 Reboot when ready, then check `sudo bootc status`. Future updates follow that
@@ -35,7 +49,7 @@ GNOME and KDE; use the corresponding installer for a new desktop installation.
 
 ## Niri with Dux Shell
 
-Select **Niri** at the login screen after installing either variant or rebasing
+Select **Niri** at the login screen after installing any variant or rebasing
 and rebooting. The native desktop session is also available. First login
 initializes `~/.config/niri` (or `$XDG_CONFIG_HOME/niri`) with Dux Shell defaults.
 Existing Niri paths and `NIRI_CONFIG` overrides are preserved; image updates
@@ -76,7 +90,7 @@ applications.
 Desktop-specific package additions and removals belong in
 [`build_files/packages/gnome.sh`](build_files/packages/gnome.sh) or
 [`build_files/packages/kde.sh`](build_files/packages/kde.sh). Most packages remain
-in [`build_files/build.sh`](build_files/build.sh). Both variants use the same
+in [`build_files/build.sh`](build_files/build.sh). All variants use the same
 [`system_files`](system_files) and Dux Shell installer.
 
 ## Build locally
@@ -92,13 +106,18 @@ installed, and `just check` to check Justfile formatting.
 just build
 # KDE image: localhost/justin-bazzite-dx-kde:latest
 DESKTOP=kde just build
+# NVIDIA Open images: localhost/justin-bazzite-dx-{gnome,kde}-nvidia-open:latest
+GPU=nvidia-open just build
+DESKTOP=kde GPU=nvidia-open just build
 
 # Existing image/tag positional arguments still work; desktop is optional third.
 just build localhost/my-gnome dev
 just build localhost/my-kde dev kde
 ```
 
-Set `DESKTOP=gnome|kde` to choose default names for all recipes. `IMAGE_NAME`
+Set `DESKTOP=gnome|kde` and `GPU=default|nvidia-open` to choose bases and default
+names for all recipes. With neither set, builds use GNOME without the NVIDIA driver.
+`IMAGE_NAME`
 overrides the default local image name; `DEFAULT_TAG` defaults to `latest`.
 An explicit third desktop argument selects the base but leaves your explicit
 image name unchanged. Use `just build` so package and initramfs content hashes
@@ -111,6 +130,7 @@ are supplied for the bind-mounted build scripts.
 just build-iso
 DESKTOP=kde just build-iso
 DESKTOP=kde just build-qcow2
+DESKTOP=kde GPU=nvidia-open just build-iso
 
 # Build the container first, then convert it.
 DESKTOP=kde just rebuild-iso
@@ -128,6 +148,7 @@ tag. For example:
 ```text
 output/gnome/localhost_justin-bazzite-dx-gnome/latest/bootiso/install.iso
 output/kde/localhost_justin-bazzite-dx-kde/latest/qcow2/disk.qcow2
+output/kde/localhost_justin-bazzite-dx-kde-nvidia-open/latest/bootiso/install.iso
 ```
 
 `spawn-vm` uses systemd-vmspawn and preserves its first three arguments:
@@ -154,14 +175,19 @@ that mount. Installing another host package does not resolve this restriction.
 
 Like the upstream template, we keep separate
 [`iso-gnome.toml`](disk_config/iso-gnome.toml) and
-[`iso-kde.toml`](disk_config/iso-kde.toml) files. Both enable installer user and
+[`iso-kde.toml`](disk_config/iso-kde.toml) files, plus matching
+[`iso-gnome-nvidia-open.toml`](disk_config/iso-gnome-nvidia-open.toml) and
+[`iso-kde-nvidia-open.toml`](disk_config/iso-kde-nvidia-open.toml) files.
+All enable installer user and
 network configuration: our GNOME base lacks the first-login setup assumed by the
 upstream GNOME config. Both local Just recipes and CI select the file for
-the requested desktop. No configuration renderer or Python dependency is needed.
+the requested desktop and GPU. No configuration renderer or Python dependency is needed.
 
 Their Kickstart `bootc switch` commands set the installed system's update source:
 GNOME follows `ghcr.io/justinschwerdtfeger/justin-bazzite-dx-gnome:latest`, and KDE follows
-`ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest`. These targets are fixed
+`ghcr.io/justinschwerdtfeger/justin-bazzite-dx-kde:latest`. NVIDIA Open installers
+follow the corresponding `-gnome-nvidia-open:latest` or `-kde-nvidia-open:latest`
+image so updates keep the NVIDIA driver. These targets are fixed
 in the selected TOML file, independently of the image name/tag passed to the disk
 builder. A local development ISO therefore follows the corresponding published
 `latest` image after installation. Edit the selected config's registry target
@@ -184,9 +210,11 @@ enrolled by OS image updates. Fixture checks run with
 
 ## CI and build caching
 
-[`build.yml`](.github/workflows/build.yml) builds both desktop variants on amd64.
+[`build.yml`](.github/workflows/build.yml) builds all four desktop/GPU combinations on amd64.
 GNOME publishes to `<repo>-gnome` and `<repo>` from one build; KDE publishes to
-`<repo>-kde`. The push step checks that all tags and the GNOME alias have the
+`<repo>-kde`. NVIDIA Open images publish to `<repo>-gnome-nvidia-open` and
+`<repo>-kde-nvidia-open`, each with its own `-build-cache` package and no alias.
+The push step checks that all tags and the default GNOME alias have the
 same digest, then signs each published image name. Metadata links still point
 to the source repository. Each desktop has a separate cache package; GNOME keeps
 `<repo>-build-cache` and KDE keeps `<repo>-kde-build-cache`.
@@ -218,8 +246,12 @@ container changes. Publish both containers before building disks for a new repo.
 Same-repository jobs authenticate rootful Podman to read GHCR images. Every disk
 artifact includes a checked SHA-256 `-CHECKSUM` file alongside the image.
 
-Choose `anaconda-iso` in the workflow's **disk-type** input to build just the two
-installers. Optional **gnome-digest** and **kde-digest** inputs accept verified
+Choose `anaconda-iso` in the workflow's **disk-type** input to build just
+installers. **gpu** defaults to `default`; choose `nvidia-open` for NVIDIA disks
+or `all` for both GPU variants. Publish the NVIDIA containers before selecting
+them. Disk PR checks continue to use the published default GPU images.
+Optional **gnome-digest**, **kde-digest**, **gnome-nvidia-open-digest**, and
+**kde-nvidia-open-digest** inputs accept verified
 `sha256:...` container digests; without them the workflow uses `latest`.
 Each artifact records its source reference in `source-image.txt`.
 

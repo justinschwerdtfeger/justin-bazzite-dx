@@ -25,6 +25,17 @@ on:
       kde-digest:
         description: "Optional verified KDE image digest (sha256:...)"
         type: string
+      gpu:
+        description: "GPU variants (publish NVIDIA containers before selecting them)"
+        type: choice
+        default: default
+        options: [default, nvidia-open, all]
+      gnome-nvidia-open-digest:
+        description: "Optional verified GNOME NVIDIA Open image digest (sha256:...)"
+        type: string
+      kde-nvidia-open-digest:
+        description: "Optional verified KDE NVIDIA Open image digest (sha256:...)"
+        type: string
   pull_request:
     branches:
       - main
@@ -45,17 +56,20 @@ concurrency:
 
 jobs:
   build:
-    name: ${{ matrix.desktop }} / ${{ matrix.disk-type }} (amd64)
+    name: ${{ matrix.desktop }} / ${{ matrix.gpu }} / ${{ matrix.disk-type }} (amd64)
     # Dux Shell's prebuilt release and the Chrome repository require amd64.
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         desktop: [gnome, kde]
+        # PR checks keep using the existing published default images.
+        gpu: ${{ fromJSON(inputs.gpu == 'all' && '["default", "nvidia-open"]' || inputs.gpu == 'nvidia-open' && '["nvidia-open"]' || '["default"]') }}
         disk-type: ${{ fromJSON(inputs.disk-type == 'anaconda-iso' && '["anaconda-iso"]' || inputs.disk-type == 'qcow2' && '["qcow2"]' || '["qcow2", "anaconda-iso"]') }}
     env:
       DESKTOP: ${{ matrix.desktop }}
-      SOURCE_DIGEST: ${{ inputs[format('{0}-digest', matrix.desktop)] }}
+      GPU: ${{ matrix.gpu }}
+      SOURCE_DIGEST: ${{ inputs[matrix.gpu == 'default' && format('{0}-digest', matrix.desktop) || format('{0}-{1}-digest', matrix.desktop, matrix.gpu)] }}
     permissions:
       contents: read
       packages: read
@@ -67,6 +81,9 @@ jobs:
           USER_UID=$(id -u)
           USER_GID=$(id -g)
           IMAGE_NAME+="-$DESKTOP"
+          GPU_SUFFIX=""
+          if [[ "$GPU" != default ]]; then GPU_SUFFIX="-$GPU"; fi
+          IMAGE_NAME+="$GPU_SUFFIX"
           IMAGE_REGISTRY="${IMAGE_REGISTRY,,}"
           IMAGE_NAME="${IMAGE_NAME,,}"
           IMAGE_SOURCE="$IMAGE_REGISTRY/$IMAGE_NAME:$DEFAULT_TAG"
@@ -81,6 +98,7 @@ jobs:
             echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}"
             echo "IMAGE_NAME=${IMAGE_NAME,,}"
             echo "IMAGE_SOURCE=$IMAGE_SOURCE"
+            echo "ISO_CONFIG=./disk_config/iso-$DESKTOP$GPU_SUFFIX.toml"
             echo "DISK_TYPE=${DISK_TYPE}"
             echo "USER_UID=${USER_UID}"
             echo "USER_GID=${USER_GID}"
@@ -107,7 +125,7 @@ jobs:
         uses: osbuild/bootc-image-builder-action@028e4d28330efe546229eb9cb52aee78174d2347 # main
         with:
           builder-image: ${{ env.BIB_IMAGE }}
-          config-file: ${{ matrix.disk-type == 'anaconda-iso' && format('./disk_config/iso-{0}.toml', matrix.desktop) || './disk_config/disk.toml' }}
+          config-file: ${{ matrix.disk-type == 'anaconda-iso' && env.ISO_CONFIG || './disk_config/disk.toml' }}
           image: ${{ env.IMAGE_SOURCE }}
           chown: ${{ env.USER_UID }}:${{ env.USER_GID }}
           rootfs: btrfs
@@ -135,7 +153,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends qemu-system-x86 xorriso
-          python3 .github/scripts/verify-iso.py "$ISO_PATH" "$RUNNER_TEMP/iso-smoke" "$DESKTOP"
+          python3 .github/scripts/verify-iso.py "$ISO_PATH" "$RUNNER_TEMP/iso-smoke" "$DESKTOP" --gpu "$GPU"
 
       - name: Upload ISO boot verification logs
         if: always() && matrix.disk-type == 'anaconda-iso'

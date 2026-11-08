@@ -1,8 +1,12 @@
 ARG DESKTOP=gnome
+ARG GPU=default
 
 # Upstream names KDE's image bazzite-dx; retain GNOME as the default.
-FROM ghcr.io/ublue-os/bazzite-dx-gnome:stable-45 AS base-gnome
-FROM ghcr.io/ublue-os/bazzite-dx:stable-45 AS base-kde
+FROM ghcr.io/ublue-os/bazzite-dx-gnome:stable-45 AS base-gnome-default
+FROM ghcr.io/ublue-os/bazzite-dx:stable-45 AS base-kde-default
+# Upstream's DX NVIDIA images use the open kernel modules.
+FROM ghcr.io/ublue-os/bazzite-dx-nvidia-gnome:stable-45 AS base-gnome-nvidia-open
+FROM ghcr.io/ublue-os/bazzite-dx-nvidia:stable-45 AS base-kde-nvidia-open
 
 # The QtEngine Copr only publishes Fedora 44 binaries. Build the same release
 # against Fedora 45's Qt libraries, keeping compilers and headers out of the OS.
@@ -31,10 +35,12 @@ COPY build_files/build-initramfs.sh /
 FROM scratch AS shell_ctx
 COPY build_files/install-dux-shell.sh /
 
-# Select the desktop base; every customization below is shared.
-FROM base-${DESKTOP} AS final
+# Select the desktop and GPU base; every customization below is shared.
+FROM base-${DESKTOP}-${GPU} AS final
 ARG DESKTOP
+ARG GPU
 LABEL io.github.justinschwerdtfeger.desktop="${DESKTOP}"
+LABEL io.github.justinschwerdtfeger.gpu="${GPU}"
 
 ### [IM]MUTABLE /opt
 ## Some bootable images, like Fedora, have /opt symlinked to /var/opt, in order to

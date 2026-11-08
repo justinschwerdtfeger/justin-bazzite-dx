@@ -6,8 +6,11 @@ on:
       - main
     paths:
       - 'Containerfile'
+      - 'Justfile'
       - 'build_files/**'
+      - 'disk_config/**'
       - 'system_files/**'
+      - 'tests/test_image_variants.py'
       - '.github/workflows/build.yml'
   schedule:
     - cron: '05 10 * * *'  # 10:05am UTC everyday
@@ -16,8 +19,11 @@ on:
       - main
     paths:
       - 'Containerfile'
+      - 'Justfile'
       - 'build_files/**'
+      - 'disk_config/**'
       - 'system_files/**'
+      - 'tests/test_image_variants.py'
       - '.github/workflows/build.yml'
   workflow_dispatch:
     inputs:
@@ -40,15 +46,17 @@ concurrency:
 
 jobs:
   build_push:
-    name: Build and push ${{ matrix.desktop }} + niri
+    name: Build and push ${{ matrix.desktop }} / ${{ matrix.gpu }} + niri
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         desktop: [gnome, kde]
+        gpu: [default, nvidia-open]
     env:
       DESKTOP: ${{ matrix.desktop }}
+      GPU: ${{ matrix.gpu }}
 
     permissions:
       contents: read
@@ -58,10 +66,11 @@ jobs:
     steps:
       - name: Prepare environment
         run: |
-          # Build each desktop once; publish the unsuffixed GNOME alias below.
+          # Only the default GNOME image owns the compatibility alias.
           IMAGE_ALIAS=""
-          if [[ "$DESKTOP" == gnome ]]; then IMAGE_ALIAS="${IMAGE_NAME,,}"; fi
+          if [[ "$DESKTOP" == gnome && "$GPU" == default ]]; then IMAGE_ALIAS="${IMAGE_NAME,,}"; fi
           IMAGE_NAME+="-$DESKTOP"
+          if [[ "$GPU" != default ]]; then IMAGE_NAME+="-$GPU"; fi
           # Lowercase the image uri
           {
             echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}"
@@ -75,6 +84,15 @@ jobs:
 
       - name: Check shell scripts
         run: shellcheck build_files/*.sh build_files/packages/*.sh system_files/usr/libexec/*
+
+      - name: Check image variant recipes
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl --fail --location --retry 3 \
+            https://github.com/casey/just/releases/download/1.59.0/just-1.59.0-x86_64-unknown-linux-musl.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP/bin" just
+          export PATH="$RUNNER_TEMP/bin:$PATH"
+          python3 -m unittest discover -s tests -p test_image_variants.py
 
       - name: Maximize build space
         uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
@@ -170,6 +188,7 @@ jobs:
         run: |
           BUILD_ARGS=(--layers --pull=always --format=docker)
           BUILD_ARGS+=(--platform linux/amd64 --build-arg "DESKTOP=$DESKTOP")
+          BUILD_ARGS+=(--build-arg "GPU=$GPU")
           BUILD_ARGS+=(--build-arg "PACKAGE_REFRESH=$PACKAGE_REFRESH")
           BUILD_ARGS+=(--build-arg "DUX_SHELL_REFRESH=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}")
           # Invalidate only the layer that uses each mounted script.
