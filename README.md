@@ -204,8 +204,10 @@ container changes. Publish both containers before building disks for a new repo.
 Same-repository jobs authenticate rootful Podman to read GHCR images. Every disk
 artifact includes a checked SHA-256 `-CHECKSUM` file alongside the image.
 
-Choose `anaconda-iso` in the workflow's **disk-type** input to build just the two
-installers. Optional **gnome-digest** and **kde-digest** inputs accept verified
+Choose `anaconda-iso` in the workflow's **disk-type** input to build installers.
+The **desktop** input defaults to both desktops; select `gnome` or `kde` to
+build or retry one installer independently. Optional **gnome-digest** and
+**kde-digest** inputs accept verified
 `sha256:...` container digests; without them the workflow uses `latest`.
 Each artifact records its source reference in `source-image.txt`.
 

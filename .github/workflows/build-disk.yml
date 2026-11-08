@@ -14,6 +14,11 @@ on:
         type: choice
         options:
           - amd64
+      desktop:
+        description: "Desktop to build"
+        type: choice
+        default: all
+        options: [all, gnome, kde]
       disk-type:
         description: "Artifacts to build"
         type: choice
@@ -40,7 +45,7 @@ env:
   BIB_IMAGE: "quay.io/centos-bootc/bootc-image-builder:latest"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}-${{ inputs.desktop || 'all' }}
   cancel-in-progress: true
 
 jobs:
@@ -51,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        desktop: [gnome, kde]
+        desktop: ${{ fromJSON(inputs.desktop == 'gnome' && '["gnome"]' || inputs.desktop == 'kde' && '["kde"]' || '["gnome", "kde"]') }}
         disk-type: ${{ fromJSON(inputs.disk-type == 'anaconda-iso' && '["anaconda-iso"]' || inputs.disk-type == 'qcow2' && '["qcow2"]' || '["qcow2", "anaconda-iso"]') }}
     env:
       DESKTOP: ${{ matrix.desktop }}
