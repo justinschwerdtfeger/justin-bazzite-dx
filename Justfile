@@ -1,6 +1,8 @@
 # DESKTOP selects defaults; the third positional argument can override it.
 export desktop := env("DESKTOP", "gnome")
-export image_name := env("IMAGE_NAME", "justin-bazzite-dx-" + desktop)
+export gpu := env("GPU", "default")
+gpu_suffix := if gpu == "default" { "" } else { "-" + gpu }
+export image_name := env("IMAGE_NAME", "justin-bazzite-dx-" + desktop + gpu_suffix)
 export default_tag := env("DEFAULT_TAG", "latest")
 export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest")
 
@@ -81,6 +83,10 @@ build $target_image=image_name $tag=default_tag $variant=desktop:
         gnome|kde) ;;
         *) echo "Unsupported desktop: $variant (expected gnome or kde)" >&2; exit 1 ;;
     esac
+    case "$gpu" in
+        default|nvidia-open) ;;
+        *) echo "Unsupported GPU: $gpu (expected default or nvidia-open)" >&2; exit 1 ;;
+    esac
     [[ $(uname -m) == x86_64 ]] || { echo "Dux Shell requires x86_64." >&2; exit 1; }
 
     BUILD_ARGS=()
@@ -96,6 +102,7 @@ build $target_image=image_name $tag=default_tag $variant=desktop:
         --platform linux/amd64 \
         --pull=newer \
         --build-arg "DESKTOP=$variant" \
+        --build-arg "GPU=$gpu" \
         --build-arg "PACKAGE_REFRESH=$(date -u +%Y%m%d)" \
         --build-arg "DUX_SHELL_REFRESH=$(date -u +%s%N)" \
         --build-arg "PACKAGE_SCRIPT_SHA=$PACKAGE_SCRIPT_SHA" \
@@ -124,6 +131,10 @@ _build-bib $target_image $tag $type $config $variant=desktop: (_rootful_load_ima
     case "$variant" in
         gnome|kde) ;;
         *) echo "Unsupported desktop: $variant (expected gnome or kde)" >&2; exit 1 ;;
+    esac
+    case "$gpu" in
+        default|nvidia-open) ;;
+        *) echo "Unsupported GPU: $gpu (expected default or nvidia-open)" >&2; exit 1 ;;
     esac
     [[ $(uname -m) == x86_64 ]] || { echo "Dux Shell requires x86_64." >&2; exit 1; }
     BUILDTMP=$(mktemp -p "${PWD}" -d -t _build-bib.XXXXXXXXXX)
@@ -157,7 +168,7 @@ build-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag $variant=
 build-raw $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_build-bib target_image tag "raw" "disk_config/disk.toml" variant)
 
 [group('Build Virtual Machine Image')]
-build-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_build-bib target_image tag "anaconda-iso" ("disk_config/iso-" + variant + ".toml") variant)
+build-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_build-bib target_image tag "anaconda-iso" ("disk_config/iso-" + variant + gpu_suffix + ".toml") variant)
 
 [group('Build Virtual Machine Image')]
 rebuild-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_rebuild-bib target_image tag "qcow2" "disk_config/disk.toml" variant)
@@ -166,7 +177,7 @@ rebuild-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag $varian
 rebuild-raw $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_rebuild-bib target_image tag "raw" "disk_config/disk.toml" variant)
 
 [group('Build Virtual Machine Image')]
-rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_rebuild-bib target_image tag "anaconda-iso" ("disk_config/iso-" + variant + ".toml") variant)
+rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_rebuild-bib target_image tag "anaconda-iso" ("disk_config/iso-" + variant + gpu_suffix + ".toml") variant)
 
 # Run a virtual machine with the specified image type and configuration
 _run-vm $target_image $tag $type $config $variant=desktop:
@@ -221,7 +232,7 @@ run-vm-raw $target_image=("localhost/" + image_name) $tag=default_tag $variant=d
 
 # Run a virtual machine from an ISO
 [group('Run Virtal Machine')]
-run-vm-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_run-vm target_image tag "iso" ("disk_config/iso-" + variant + ".toml") variant)
+run-vm-iso $target_image=("localhost/" + image_name) $tag=default_tag $variant=desktop: && (_run-vm target_image tag "iso" ("disk_config/iso-" + variant + gpu_suffix + ".toml") variant)
 
 # Run a virtual machine using systemd-vmspawn
 [group('Run Virtal Machine')]
