@@ -39,6 +39,13 @@ if [[ -z "${DESTDIR:-}" ]]; then
   niri_defaults=/usr/share/doc/niri/default-config.kdl
   config_dir=/usr/share/dux-shell/niri
 
+  # Match upstream's oo7 preference when using an older Niri package.
+  portal_defaults=/usr/share/xdg-desktop-portal/niri-portals.conf
+  if grep -Fqx 'org.freedesktop.impl.portal.Secret=gnome-keyring;' "$portal_defaults"; then
+    sed -i 's/^org\.freedesktop\.impl\.portal\.Secret=gnome-keyring;$/org.freedesktop.impl.portal.Secret=oo7-portal;gnome-keyring;/' \
+      "$portal_defaults"
+  fi
+
   if [[ "${DESKTOP:-gnome}" == kde ]]; then
     # KService needs Plasma's menu to discover applications outside Plasma.
     test -f /etc/xdg/menus/plasma-applications.menu
@@ -50,7 +57,6 @@ Environment=XDG_MENU_PREFIX=plasma-
 EOF
     done
     # Keep Niri's other portal backends, including GNOME screen sharing.
-    portal_defaults=/usr/share/xdg-desktop-portal/niri-portals.conf
     grep -qx '\[preferred\]' "$portal_defaults"
     install -d /etc/xdg/xdg-desktop-portal
     sed '/^org\.freedesktop\.impl\.portal\.FileChooser=/d; /^\[preferred\]$/a org.freedesktop.impl.portal.FileChooser=kde;' \
