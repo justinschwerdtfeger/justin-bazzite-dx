@@ -1,3 +1,11 @@
 [[customizations.filesystem]]
 mountpoint = "/"
 minsize = "20 GiB"
+
+# Enroll only newly built QCOW2/raw deployments, never regular image updates.
+[[customizations.files]]
+path = "/etc/justin-flatpak-setup-pending"
+mode = "0644"
+user = "root"
+group = "root"
+data = ""

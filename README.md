@@ -168,6 +168,20 @@ builder. A local development ISO therefore follows the corresponding published
 when publishing a fork or using a different update channel; changing `IMAGE_NAME`
 or `DEFAULT_TAG` alone does not change the installer target.
 
+New ISO, QCOW2, and raw deployments install Bazzite's matching GNOME or KDE Flatpak
+defaults in the background, starting about two minutes after boot. Setup needs
+GitHub and Flathub access; offline boots still reach the desktop. Failed or
+interrupted setup retries about every five minutes and after reboot. Downloads may
+continue after login. The defaults include Flatpak Firefox alongside this image's
+native Firefox package.
+
+Check progress with `journalctl -u justin-flatpak-setup.service` and retry now with
+`sudo systemctl start justin-flatpak-setup.service`. Only new deployments get
+`/etc/justin-flatpak-setup-pending`; successful setup removes it, so later boots
+and updates leave removed apps alone. Existing installations and rebases are not
+enrolled by OS image updates. Fixture checks run with
+`python3 -B -m unittest discover -s tests -v`.
+
 ## CI and build caching
 
 [`build.yml`](.github/workflows/build.yml) builds both desktop variants on amd64.
